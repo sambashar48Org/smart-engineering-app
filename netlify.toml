@@ -1,0 +1,33 @@
+# ============================================================
+# إعدادات النشر على Netlify - مشروع مستقل تماماً
+# ============================================================
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# إعادة التوجيه لـ SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# رؤوس أمان
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# رؤوس Service Worker
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# رؤوس الأيقونات والملفات الثابتة
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"

@@ -1,0 +1,17 @@
+# تخلص من ملفات النظام
+node_modules/
+dist/
+.env
+.env.local
+.env.production
+*.log
+.DS_Store
+Thumbs.db
+
+# تخلص من ملفات المحرر
+.vscode/
+.idea/
+
+# تخلص من ملفات مؤقتة
+*.tmp
+*.bak
