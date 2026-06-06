@@ -1,6 +1,7 @@
 // ============================================================
 // رسم مقطع الأساس العرضي (Section View)
 // الكود العربي السوري 2024 - يدعم العمود المعدني والشد
+// الرموز الكودية: t, D_f, σ₁
 // ============================================================
 
 import type { FoundationInputs } from '@/stores/foundationStore';
@@ -17,7 +18,7 @@ export function drawFoundationSection(
   customOpts: Partial<DrawOptions> = {}
 ) {
   const opts = { ...DEFAULT_DRAW_OPTIONS, ...customOpts };
-  const { width: B, length: L, depth: D, thickness: h, columnWidth: c1, columnDepth: c2, cover, isSteelColumn, basePlateWidth, basePlateDepth } = inputs;
+  const { B, L, D_f, t, columnWidth: c1, columnDepth: c2, cover, isSteelColumn, basePlateWidth, basePlateDepth } = inputs;
 
   // تنظيف Canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -26,7 +27,7 @@ export function drawFoundationSection(
   const maxW = canvas.width - 200;
   const maxH = canvas.height - 150;
   const scaleX = maxW / (B * 1.2);
-  const scaleY = maxH / (D * 1.5);
+  const scaleY = maxH / (D_f * 1.5);
   const scale = Math.min(scaleX, scaleY);
 
   // نقطة المركز
@@ -35,8 +36,8 @@ export function drawFoundationSection(
 
   // أبعاد بالبكسل
   const bPx = B * scale;
-  const dPx = D * scale;
-  const hPx = h * scale;
+  const dPx = D_f * scale;
+  const tPx = t * scale;
   const c1Px = c1 * scale;
 
   // ─── التربة (خلفية) ───
@@ -58,9 +59,9 @@ export function drawFoundationSection(
   drawFilledRect(
     ctx,
     centerX - bPx / 2,
-    baseY - hPx,
+    baseY - tPx,
     bPx,
-    hPx,
+    tPx,
     opts.concreteColor,
     opts.color,
     opts.lineWidth
@@ -70,9 +71,9 @@ export function drawFoundationSection(
   drawHatching(
     ctx,
     centerX - bPx / 2,
-    baseY - hPx,
+    baseY - tPx,
     bPx,
-    hPx,
+    tPx,
     15,
     -45,
     '#a1a1aa'
@@ -89,7 +90,7 @@ export function drawFoundationSection(
     drawFilledRect(
       ctx,
       centerX - steelWidth / 2,
-      baseY - hPx - colHeight,
+      baseY - tPx - colHeight,
       steelWidth,
       colHeight,
       '#64748b',
@@ -99,11 +100,11 @@ export function drawFoundationSection(
 
     // صفيحة الارتكاز (Base Plate)
     const bpW = (basePlateWidth || c1) * scale;
-    const bpH = Math.max(8, hPx * 0.08);
+    const bpH = Math.max(8, tPx * 0.08);
     drawFilledRect(
       ctx,
       centerX - bpW / 2,
-      baseY - hPx - bpH,
+      baseY - tPx - bpH,
       bpW,
       bpH,
       '#475569',
@@ -113,25 +114,24 @@ export function drawFoundationSection(
 
     // خط القطاع الحرج للعمود المعدني (منتصف المسافة)
     const midPlate = ((basePlateDepth || c2) + c2) / 2 * scale;
-    const criticalX = centerX - bPx / 2;
     const criticalLineX = centerX - bPx / 2 + (bPx - midPlate) / 2;
 
     ctx.setLineDash([6, 3]);
     ctx.beginPath();
-    ctx.moveTo(criticalLineX, baseY - hPx);
+    ctx.moveTo(criticalLineX, baseY - tPx);
     ctx.lineTo(criticalLineX, baseY);
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.setLineDash([]);
 
-    drawLabel(ctx, 'القطاع الحرج', criticalLineX, baseY - hPx - 15, opts);
+    drawLabel(ctx, 'القطاع الحرج', criticalLineX, baseY - tPx - 15, opts);
   } else {
     // عمود خرساني عادي
     drawFilledRect(
       ctx,
       centerX - c1Px / 2,
-      baseY - hPx - colHeight,
+      baseY - tPx - colHeight,
       c1Px,
       colHeight,
       '#94a3b8',
@@ -143,19 +143,19 @@ export function drawFoundationSection(
     const criticalX = centerX - c1Px / 2;
     ctx.setLineDash([6, 3]);
     ctx.beginPath();
-    ctx.moveTo(criticalX, baseY - hPx);
+    ctx.moveTo(criticalX, baseY - tPx);
     ctx.lineTo(criticalX, baseY);
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.setLineDash([]);
 
-    drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - hPx - 15, opts);
+    drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - tPx - 15, opts);
   }
 
   // ─── التسليح ───
   if (opts.showRebar && results.calculated) {
-    const dEffective = (h * 1000 - cover - 10) / 1000; // m
+    const dEffective = (t * 1000 - cover - 10) / 1000;
     const rebarDepth = dEffective * scale;
 
     // أسياخ سفلية
@@ -178,7 +178,7 @@ export function drawFoundationSection(
     }
 
     // أسياخ علوية
-    const topRebarY = baseY - hPx + 15;
+    const topRebarY = baseY - tPx + 15;
     ctx.beginPath();
     ctx.moveTo(centerX - bPx / 2 + 10, topRebarY);
     ctx.lineTo(centerX + bPx / 2 - 10, topRebarY);
@@ -195,13 +195,13 @@ export function drawFoundationSection(
 
     // تظليل منطقة الشد باللون الأحمر
     ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
-    ctx.fillRect(tensionStartX, baseY - hPx, tensionWidth, hPx);
+    ctx.fillRect(tensionStartX, baseY - tPx, tensionWidth, tPx);
 
     // علامة تحذيرية
     ctx.font = 'bold 12px Cairo, sans-serif';
     ctx.fillStyle = '#dc2626';
     ctx.textAlign = 'center';
-    ctx.fillText('منطقة شد', tensionStartX + tensionWidth / 2, baseY - hPx / 2);
+    ctx.fillText('منطقة شد', tensionStartX + tensionWidth / 2, baseY - tPx / 2);
   }
 
   // ─── خطوط الأبعاد ───
@@ -213,31 +213,31 @@ export function drawFoundationSection(
       baseY + 15,
       centerX + bPx / 2,
       baseY + 15,
-      `${B} m`,
+      `B = ${B} m`,
       30,
       opts
     );
 
-    // سماكة اللبشة
+    // سمك بلاطة الأساس (t)
     drawDimensionLine(
       ctx,
       centerX + bPx / 2 + 15,
       baseY,
       centerX + bPx / 2 + 15,
-      baseY - hPx,
-      `${h} m`,
+      baseY - tPx,
+      `t = ${t} m`,
       30,
       opts
     );
 
-    // العمق الكلي
+    // منسوب التأسيس (D_f)
     drawDimensionLine(
       ctx,
       centerX - bPx / 2 - 15,
       baseY,
       centerX - bPx / 2 - 15,
       baseY - dPx,
-      `${D} m`,
+      `D_f = ${D_f} m`,
       30,
       opts
     );
@@ -246,9 +246,9 @@ export function drawFoundationSection(
     drawDimensionLine(
       ctx,
       centerX - c1Px / 2,
-      baseY - hPx - colHeight - 10,
+      baseY - tPx - colHeight - 10,
       centerX + c1Px / 2,
-      baseY - hPx - colHeight - 10,
+      baseY - tPx - colHeight - 10,
       `${c1} m`,
       15,
       opts
@@ -257,12 +257,12 @@ export function drawFoundationSection(
 
   // ─── التسميات ───
   if (opts.showLabels) {
-    drawLabel(ctx, 'خرسانة', centerX, baseY - hPx / 2, opts);
+    drawLabel(ctx, 'خرسانة', centerX, baseY - tPx / 2, opts);
 
     if (isSteelColumn) {
-      drawLabel(ctx, 'عمود معدني', centerX, baseY - hPx - colHeight / 2, opts);
+      drawLabel(ctx, 'عمود معدني', centerX, baseY - tPx - colHeight / 2, opts);
     } else {
-      drawLabel(ctx, 'عمود', centerX, baseY - hPx - colHeight / 2, opts);
+      drawLabel(ctx, 'عمود', centerX, baseY - tPx - colHeight / 2, opts);
     }
 
     drawLabel(ctx, 'تربة', centerX + bPx / 2 - 30, baseY - dPx + 20, opts);
@@ -270,7 +270,7 @@ export function drawFoundationSection(
     if (results.calculated) {
       drawLabel(
         ctx,
-        `q_max = ${results.maxStress} kN/m²`,
+        `σ₁ = ${results.sigma_1} kN/m²`,
         centerX,
         baseY + 55,
         opts

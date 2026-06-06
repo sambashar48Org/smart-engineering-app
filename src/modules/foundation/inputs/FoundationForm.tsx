@@ -1,5 +1,6 @@
 // ============================================================
 // نموذج إدخال بيانات الأساس - الكود العربي السوري 2024
+// الرموز الكودية: V, t, D_f, q_allowable, c_w, δ, f'_c, f_y
 // ============================================================
 
 import React from 'react';
@@ -11,9 +12,9 @@ import type { FoundationType, LoadCase } from '@/types';
 
 const FOUNDATION_TYPES: { value: FoundationType; labelAr: string; labelEn: string }[] = [
   { value: 'isolated', labelAr: 'أساس منفرد', labelEn: 'Isolated' },
-  { value: 'combined', labelAr: 'أساس متصل', labelEn: 'Combined' },
+  { value: 'combined', labelAr: 'أساس مشترك', labelEn: 'Combined' },
   { value: 'strap', labelAr: 'أساس لَبّي', labelEn: 'Strap' },
-  { value: 'mat', labelAr: 'حصيرة أساسات', labelEn: 'Mat/Raft' },
+  { value: 'mat', labelAr: 'حصيرة عامة', labelEn: 'Mat/Raft' },
 ];
 
 const LOAD_CASES: { value: LoadCase; labelAr: string; labelEn: string; color: string }[] = [
@@ -23,19 +24,19 @@ const LOAD_CASES: { value: LoadCase; labelAr: string; labelEn: string; color: st
 ];
 
 const CONCRETE_GRADES = [
-  { value: 'C20/25', label: 'C20/25' },
-  { value: 'C25/30', label: 'C25/30' },
-  { value: 'C30/37', label: 'C30/37' },
-  { value: 'C35/45', label: 'C35/45' },
-  { value: 'C40/50', label: 'C40/50' },
+  { value: 'C20/25', label: 'C20/25 (f\'c=20)' },
+  { value: 'C25/30', label: 'C25/30 (f\'c=25)' },
+  { value: 'C30/37', label: 'C30/37 (f\'c=30)' },
+  { value: 'C35/45', label: 'C35/45 (f\'c=35)' },
+  { value: 'C40/50', label: 'C40/50 (f\'c=40)' },
 ];
 
 const STEEL_GRADES = [
-  { value: 'B240', label: 'B240' },
-  { value: 'B300', label: 'B300' },
-  { value: 'B400', label: 'B400' },
-  { value: 'B500', label: 'B500' },
-  { value: 'B520', label: 'B520' },
+  { value: 'B240', label: 'B240 (fy=240)' },
+  { value: 'B300', label: 'B300 (fy=300)' },
+  { value: 'B400', label: 'B400 (fy=400)' },
+  { value: 'B500', label: 'B500 (fy=500)' },
+  { value: 'B520', label: 'B520 (fy=520)' },
 ];
 
 const BAR_DIAMETERS = [
@@ -105,33 +106,33 @@ export default function FoundationForm() {
         </h4>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
-            label={t('input.width', lang)}
-            value={inputs.width}
-            onChange={(v) => setInputs({ width: v })}
+            label={lang === 'ar' ? 'العرض B (m)' : 'Width B (m)'}
+            value={inputs.B}
+            onChange={(v) => setInputs({ B: v })}
             unit="m"
             min={0.1}
             step={0.1}
           />
           <NumberInput
-            label={t('input.length', lang)}
-            value={inputs.length}
-            onChange={(v) => setInputs({ length: v })}
+            label={lang === 'ar' ? 'الطول L (m)' : 'Length L (m)'}
+            value={inputs.L}
+            onChange={(v) => setInputs({ L: v })}
             unit="m"
             min={0.1}
             step={0.1}
           />
           <NumberInput
-            label={t('input.depth', lang)}
-            value={inputs.depth}
-            onChange={(v) => setInputs({ depth: v })}
+            label={lang === 'ar' ? 'منسوب التأسيس D_f (m)' : 'Founding Depth D_f (m)'}
+            value={inputs.D_f}
+            onChange={(v) => setInputs({ D_f: v })}
             unit="m"
             min={0.1}
             step={0.1}
           />
           <NumberInput
-            label={t('input.thickness', lang)}
-            value={inputs.thickness}
-            onChange={(v) => setInputs({ thickness: v })}
+            label={lang === 'ar' ? 'سمك بلاطة الأساس t (m)' : 'Slab Thickness t (m)'}
+            value={inputs.t}
+            onChange={(v) => setInputs({ t: v })}
             unit="m"
             min={0.1}
             step={0.05}
@@ -139,40 +140,40 @@ export default function FoundationForm() {
         </div>
       </div>
 
-      {/* الأحمال */}
+      {/* الأحمال التشغيلية المؤثرة (Service Loads) */}
       <div className="space-y-3">
         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          {lang === 'ar' ? 'الأحمال التشغيلية' : 'Service Loads'}
+          {lang === 'ar' ? 'الأحمال التشغيلية المؤثرة (Service Loads)' : 'Service Loads'}
         </h4>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
-            label={t('input.axialLoad', lang)}
-            value={inputs.axialLoad}
-            onChange={(v) => setInputs({ axialLoad: v })}
+            label={lang === 'ar' ? 'الحمولة الشاقولية الكلية V (kN)' : 'Total Vertical Load V (kN)'}
+            value={inputs.V}
+            onChange={(v) => setInputs({ V: v })}
             unit="kN"
             min={0}
             step={10}
           />
           <NumberInput
-            label={t('input.momentX', lang)}
-            value={inputs.momentX}
-            onChange={(v) => setInputs({ momentX: v })}
+            label={lang === 'ar' ? 'العزم المركزي M_x (kN.m)' : 'Moment M_x (kN.m)'}
+            value={inputs.M_x}
+            onChange={(v) => setInputs({ M_x: v })}
             unit="kN.m"
             min={0}
             step={5}
           />
           <NumberInput
-            label={t('input.momentY', lang)}
-            value={inputs.momentY}
-            onChange={(v) => setInputs({ momentY: v })}
+            label={lang === 'ar' ? 'العزم المركزي M_y (kN.m)' : 'Moment M_y (kN.m)'}
+            value={inputs.M_y}
+            onChange={(v) => setInputs({ M_y: v })}
             unit="kN.m"
             min={0}
             step={5}
           />
           <NumberInput
-            label={t('input.horizontalForce', lang)}
-            value={inputs.horizontalForce}
-            onChange={(v) => setInputs({ horizontalForce: v })}
+            label={lang === 'ar' ? 'القوة الأفقية H (kN)' : 'Horizontal Force H (kN)'}
+            value={inputs.H}
+            onChange={(v) => setInputs({ H: v })}
             unit="kN"
             min={0}
             step={5}
@@ -187,15 +188,15 @@ export default function FoundationForm() {
         </h4>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
-            label={t('input.bearingCapacity', lang)}
-            value={inputs.bearingCapacity}
-            onChange={(v) => setInputs({ bearingCapacity: v })}
+            label={lang === 'ar' ? 'إجهاد التحميل المسموح به للتربة q (kN/m²)' : 'Allowable Bearing q (kN/m²)'}
+            value={inputs.q_allowable}
+            onChange={(v) => setInputs({ q_allowable: v })}
             unit="kN/m²"
             min={10}
             step={10}
           />
           <NumberInput
-            label={t('input.soilDensity', lang)}
+            label={lang === 'ar' ? 'كثافة التربة γ (kN/m³)' : 'Soil Density γ (kN/m³)'}
             value={inputs.soilDensity}
             onChange={(v) => setInputs({ soilDensity: v })}
             unit="kN/m³"
@@ -203,17 +204,17 @@ export default function FoundationForm() {
             step={1}
           />
           <NumberInput
-            label={lang === 'ar' ? 'تماسك التربة cw' : 'Soil Cohesion cw'}
-            value={inputs.cohesion}
-            onChange={(v) => setInputs({ cohesion: v })}
+            label={lang === 'ar' ? 'إجهاد التماسك c_w (kN/m²)' : 'Cohesion c_w (kN/m²)'}
+            value={inputs.c_w}
+            onChange={(v) => setInputs({ c_w: v })}
             unit="kN/m²"
             min={0}
             step={5}
           />
           <NumberInput
-            label={lang === 'ar' ? 'زاوية الاحتكاك δ' : 'Friction Angle δ'}
-            value={inputs.deltaFriction}
-            onChange={(v) => setInputs({ deltaFriction: v })}
+            label={lang === 'ar' ? 'زاوية الاحتكاك بين الأساس والتربة δ (°)' : 'Friction Angle δ (°)'}
+            value={inputs.delta_friction}
+            onChange={(v) => setInputs({ delta_friction: v })}
             unit="°"
             min={0}
             step={5}
@@ -228,27 +229,37 @@ export default function FoundationForm() {
         </h4>
         <div className="grid grid-cols-2 gap-3">
           <SelectInput
-            label={t('input.concreteGrade', lang)}
+            label={lang === 'ar' ? 'فئة الخرسانة (المقاومة الأسطوانية f\'_c)' : 'Concrete Grade (f\'_c)'}
             value={inputs.concreteGrade}
             onChange={(v) => setInputs({ concreteGrade: v })}
             options={CONCRETE_GRADES}
           />
           <SelectInput
-            label={t('input.steelGrade', lang)}
+            label={lang === 'ar' ? 'فئة الحديد (إجهاد الخضوع f_y)' : 'Steel Grade (f_y)'}
             value={inputs.steelGrade}
             onChange={(v) => setInputs({ steelGrade: v })}
             options={STEEL_GRADES}
           />
-          <NumberInput
-            label={t('input.cover', lang)}
-            value={inputs.cover}
-            onChange={(v) => setInputs({ cover: v })}
-            unit="mm"
-            min={20}
-            step={5}
-          />
+          <div className="space-y-1">
+            <NumberInput
+              label={lang === 'ar' ? 'سمك طبقة التغطية الخرسانية (mm)' : 'Concrete Cover (mm)'}
+              value={inputs.cover}
+              onChange={(v) => setInputs({ cover: v })}
+              unit="mm"
+              min={20}
+              step={5}
+            />
+            {/* تنبيه الغطاء الخرساني */}
+            {inputs.cover < 50 && (
+              <div className="flex items-center gap-1 p-1.5 bg-red-50 rounded border border-red-200">
+                <span className="text-xs font-semibold text-red-600">
+                  {lang === 'ar' ? '⚠ الغطاء أقل من 50mm الموصى به للأساسات!' : '⚠ Cover less than 50mm recommended for foundations!'}
+                </span>
+              </div>
+            )}
+          </div>
           <SelectInput
-            label={lang === 'ar' ? 'قطر السيخ' : 'Bar Diameter'}
+            label={lang === 'ar' ? 'قطر السيخ (لا يقل عن 12mm)' : 'Bar Diameter (min 12mm)'}
             value={String(inputs.barDiameterChosen)}
             onChange={(v) => setInputs({ barDiameterChosen: parseInt(v) })}
             options={BAR_DIAMETERS}
@@ -263,7 +274,7 @@ export default function FoundationForm() {
         </h4>
         <div className="grid grid-cols-2 gap-3">
           <NumberInput
-            label={t('input.columnWidth', lang)}
+            label={lang === 'ar' ? 'عرض العمود (m)' : 'Column Width (m)'}
             value={inputs.columnWidth}
             onChange={(v) => setInputs({ columnWidth: v })}
             unit="m"
@@ -271,7 +282,7 @@ export default function FoundationForm() {
             step={0.05}
           />
           <NumberInput
-            label={t('input.columnDepth', lang)}
+            label={lang === 'ar' ? 'عمق العمود (m)' : 'Column Depth (m)'}
             value={inputs.columnDepth}
             onChange={(v) => setInputs({ columnDepth: v })}
             unit="m"
@@ -290,7 +301,7 @@ export default function FoundationForm() {
               className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
             />
             <span className="text-sm text-gray-700">
-              {lang === 'ar' ? 'عمود معدني' : 'Steel Column'}
+              {lang === 'ar' ? 'عمود معدني مع صفيحة ارتكاز' : 'Steel Column with Base Plate'}
             </span>
           </label>
         </div>
@@ -299,7 +310,7 @@ export default function FoundationForm() {
         {inputs.isSteelColumn && (
           <div className="grid grid-cols-2 gap-3 mt-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
             <NumberInput
-              label={lang === 'ar' ? 'عرض الصفيحة' : 'Base Plate Width'}
+              label={lang === 'ar' ? 'عرض صفيحة الارتكاز (m)' : 'Base Plate Width (m)'}
               value={inputs.basePlateWidth}
               onChange={(v) => setInputs({ basePlateWidth: v })}
               unit="m"
@@ -307,7 +318,7 @@ export default function FoundationForm() {
               step={0.05}
             />
             <NumberInput
-              label={lang === 'ar' ? 'عمق الصفيحة' : 'Base Plate Depth'}
+              label={lang === 'ar' ? 'عمق صفيحة الارتكاز (m)' : 'Base Plate Depth (m)'}
               value={inputs.basePlateDepth}
               onChange={(v) => setInputs({ basePlateDepth: v })}
               unit="m"

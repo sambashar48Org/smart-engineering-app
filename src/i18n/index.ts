@@ -1,5 +1,6 @@
 // ============================================================
 // نظام الترجمة عربي/إنجليزي - الكود العربي السوري 2024
+// الرموز الكودية: σ₁, σ₂, V, t, D_f, q_magnified, f'_c, f_y, c_w, δ
 // ============================================================
 
 import type { Lang } from '@/types';
@@ -21,55 +22,56 @@ const translations: Record<string, Record<Lang, string>> = {
   // الأساسات
   'foundation.title': { ar: 'تصميم الأساسات', en: 'Foundation Design' },
   'foundation.isolated': { ar: 'أساس منفرد', en: 'Isolated Foundation' },
-  'foundation.combined': { ar: 'أساس متصل', en: 'Combined Foundation' },
+  'foundation.combined': { ar: 'أساس مشترك', en: 'Combined Foundation' },
   'foundation.strap': { ar: 'أساس لَبّي', en: 'Strap Foundation' },
-  'foundation.mat': { ar: 'حصيرة أساسات', en: 'Mat Foundation' },
+  'foundation.mat': { ar: 'حصيرة عامة', en: 'Mat Foundation' },
   'foundation.codeRef': { ar: 'الكود العربي السوري 2024 - ملحق 5', en: 'Syrian Arabic Code 2024 - Annex 5' },
 
-  // المدخلات
-  'input.width': { ar: 'العرض B', en: 'Width B' },
-  'input.length': { ar: 'الطول L', en: 'Length L' },
-  'input.depth': { ar: 'العمق D', en: 'Depth D' },
-  'input.thickness': { ar: 'سماكة اللبشة h', en: 'Slab Thickness h' },
-  'input.axialLoad': { ar: 'الحمل الرأسي N (تشغيلي)', en: 'Axial Load N (Service)' },
-  'input.momentX': { ar: 'عزم Mx', en: 'Moment Mx' },
-  'input.momentY': { ar: 'عزم My', en: 'Moment My' },
-  'input.horizontalForce': { ar: 'قوة أفقية H', en: 'Horizontal Force H' },
-  'input.bearingCapacity': { ar: 'إجهاد التربة q_all', en: 'Bearing Capacity q_all' },
-  'input.soilDensity': { ar: 'كثافة التربة', en: 'Soil Density' },
-  'input.concreteGrade': { ar: 'فئة الخرسانة', en: 'Concrete Grade' },
-  'input.steelGrade': { ar: 'فئة الحديد', en: 'Steel Grade' },
-  'input.cover': { ar: 'الغطاء الخرساني', en: 'Concrete Cover' },
-  'input.columnWidth': { ar: 'عرض العمود', en: 'Column Width' },
-  'input.columnDepth': { ar: 'عمق العمود', en: 'Column Depth' },
+  // المدخلات - الرموز الكودية السورية
+  'input.width': { ar: 'العرض B (m)', en: 'Width B (m)' },
+  'input.length': { ar: 'الطول L (m)', en: 'Length L (m)' },
+  'input.depth': { ar: 'منسوب التأسيس D_f (m)', en: 'Founding Depth D_f (m)' },
+  'input.thickness': { ar: 'سمك بلاطة الأساس t (m)', en: 'Slab Thickness t (m)' },
+  'input.axialLoad': { ar: 'الحمولة الشاقولية الكلية V (kN)', en: 'Total Vertical Load V (kN)' },
+  'input.momentX': { ar: 'العزم المركزي M_x (kN.m)', en: 'Moment M_x (kN.m)' },
+  'input.momentY': { ar: 'العزم المركزي M_y (kN.m)', en: 'Moment M_y (kN.m)' },
+  'input.horizontalForce': { ar: 'القوة الأفقية H (kN)', en: 'Horizontal Force H (kN)' },
+  'input.bearingCapacity': { ar: 'إجهاد التحميل المسموح به للتربة q (kN/m²)', en: 'Allowable Bearing q (kN/m²)' },
+  'input.soilDensity': { ar: 'كثافة التربة γ (kN/m³)', en: 'Soil Density γ (kN/m³)' },
+  'input.concreteGrade': { ar: 'فئة الخرسانة (المقاومة الأسطوانية f\'_c)', en: 'Concrete Grade (f\'_c)' },
+  'input.steelGrade': { ar: 'فئة الحديد (إجهاد الخضوع f_y)', en: 'Steel Grade (f_y)' },
+  'input.cover': { ar: 'سمك طبقة التغطية الخرسانية (mm)', en: 'Concrete Cover (mm)' },
+  'input.columnWidth': { ar: 'عرض العمود (m)', en: 'Column Width (m)' },
+  'input.columnDepth': { ar: 'عمق العمود (m)', en: 'Column Depth (m)' },
   'input.loadCase': { ar: 'حالة التحميل', en: 'Load Case' },
-  'input.isSteelColumn': { ar: 'عمود معدني', en: 'Steel Column' },
-  'input.basePlateWidth': { ar: 'عرض الصفيحة', en: 'Base Plate Width' },
-  'input.basePlateDepth': { ar: 'عمق الصفيحة', en: 'Base Plate Depth' },
-  'input.barDiameter': { ar: 'قطر السيخ', en: 'Bar Diameter' },
-  'input.betaEccentricity': { ar: 'معامل β', en: 'β Factor' },
-  'input.cohesion': { ar: 'تماسك التربة', en: 'Soil Cohesion' },
-  'input.deltaFriction': { ar: 'زاوية الاحتكاك', en: 'Friction Angle' },
+  'input.isSteelColumn': { ar: 'عمود معدني مع صفيحة ارتكاز', en: 'Steel Column with Base Plate' },
+  'input.basePlateWidth': { ar: 'عرض صفيحة الارتكاز (m)', en: 'Base Plate Width (m)' },
+  'input.basePlateDepth': { ar: 'عمق صفيحة الارتكاز (m)', en: 'Base Plate Depth (m)' },
+  'input.barDiameter': { ar: 'قطر السيخ (لا يقل عن 12mm)', en: 'Bar Diameter (min 12mm)' },
+  'input.betaEccentricity': { ar: 'معامل β للقص الثاقب', en: 'Punching Shear β Factor' },
+  'input.cohesion': { ar: 'إجهاد التماسك c_w (kN/m²)', en: 'Cohesion c_w (kN/m²)' },
+  'input.deltaFriction': { ar: 'زاوية الاحتكاك بين الأساس والتربة δ (°)', en: 'Friction Angle δ (°)' },
 
   // حالات التحميل
   'loadCase.1': { ar: 'أحمال دائمة + حية', en: 'Dead + Live' },
   'loadCase.2': { ar: 'أحمال + رياح', en: 'Loads + Wind' },
   'loadCase.3': { ar: 'أحمال + زلزال', en: 'Loads + Seismic' },
 
-  // النتائج
+  // النتائج - الرموز الكودية السورية
   'result.bearingStress': { ar: 'إجهاد التربة', en: 'Bearing Stress' },
-  'result.maxStress': { ar: 'الإجهاد الأقصى', en: 'Max Stress' },
-  'result.minStress': { ar: 'الإجهاد الأدنى', en: 'Min Stress' },
-  'result.utilization': { ar: 'نسبة الاستثمار', en: 'Utilization Ratio' },
-  'result.punchingShear': { ar: 'القص الثاقب', en: 'Punching Shear' },
-  'result.oneWayShear': { ar: 'القص أحادي', en: 'One-way Shear' },
+  'result.maxStress': { ar: 'الإجهاد الأكبر σ₁', en: 'Max Stress σ₁' },
+  'result.minStress': { ar: 'الإجهاد الأصغر σ₂', en: 'Min Stress σ₂' },
+  'result.utilization': { ar: 'نسبة التحقق من إجهاد التربة', en: 'Bearing Verification Ratio' },
+  'result.punchingShear': { ar: 'التحقق من إجهاد الثقب للخرسانة', en: 'Punching Shear Verification' },
+  'result.oneWayShear': { ar: 'التحقق من جهد القص بالقطاع الحرج', en: 'One-Way Shear Verification' },
   'result.reinforcement': { ar: 'التسليح', en: 'Reinforcement' },
   'result.bottomRebar': { ar: 'تسليح أسفل', en: 'Bottom Reinforcement' },
   'result.topRebar': { ar: 'تسليح أعلى', en: 'Top Reinforcement' },
-  'result.overturning': { ar: 'معامل أمان الانقلاب', en: 'Overturning Safety Factor' },
-  'result.sliding': { ar: 'معامل أمان الانزلاق', en: 'Sliding Safety Factor' },
-  'result.buoyancy': { ar: 'معامل أمان التعويم', en: 'Buoyancy Safety Factor' },
+  'result.overturning': { ar: 'درجة الاستقرار ضد الانقلاب (Base-PSR)', en: 'Overturning Stability (Base-PSR)' },
+  'result.sliding': { ar: 'معامل الأمان من الانزلاق (F_s)', en: 'Sliding Safety Factor (F_s)' },
+  'result.buoyancy': { ar: 'معامل الأمان من التعويم', en: 'Buoyancy Safety Factor' },
   'result.stability': { ar: 'الاستقرار والثبات', en: 'Stability Checks' },
+  'result.magnifiedAllowable': { ar: 'إجهاد التحميل المسموح المكبر', en: 'Magnified Allowable Bearing' },
 
   // حالات التحقق
   'check.pass': { ar: 'آمن', en: 'Pass' },

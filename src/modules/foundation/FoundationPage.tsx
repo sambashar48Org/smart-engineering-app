@@ -1,6 +1,7 @@
 // ============================================================
 // صفحة تصميم الأساسات الرئيسية (Tri-Panel Layout)
 // الكود العربي السوري 2024 - ملحق 5
+// الرموز الكودية: σ₁, σ₂, V, t, D_f, q_magnified
 // ============================================================
 
 import React, { useState, useCallback } from 'react';
@@ -13,6 +14,13 @@ import FoundationForm from './inputs/FoundationForm';
 import DrawingCanvas from './components/DrawingCanvas';
 import ResultsPanel from './components/ResultsPanel';
 import { calculateFoundation } from './calculations';
+
+const FOUNDATION_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
+  isolated: { ar: 'أساس منفرد', en: 'Isolated Foundation' },
+  combined: { ar: 'أساس مشترك', en: 'Combined Foundation' },
+  strap: { ar: 'أساس لَبّي', en: 'Strap Foundation' },
+  mat: { ar: 'حصيرة عامة', en: 'Mat/Raft Foundation' },
+};
 
 const LOAD_CASE_LABELS = {
   1: { ar: 'دائمة + حية', en: 'Dead + Live', color: 'bg-green-100 text-green-800' },
@@ -42,6 +50,7 @@ export default function FoundationPage() {
   }, [inputs, setResults]);
 
   const loadCaseInfo = LOAD_CASE_LABELS[inputs.loadCase];
+  const typeLabel = FOUNDATION_TYPE_LABELS[inputs.type] || FOUNDATION_TYPE_LABELS.isolated;
 
   return (
     <div className="h-full flex flex-col">
@@ -56,7 +65,7 @@ export default function FoundationPage() {
               {t('foundation.title', lang)}
             </h1>
             <p className="text-xs text-gray-400">
-              {lang === 'ar' ? 'أساس منفرد' : 'Isolated Foundation'}
+              {lang === 'ar' ? typeLabel.ar : typeLabel.en}
             </p>
           </div>
         </div>

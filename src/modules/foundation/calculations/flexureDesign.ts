@@ -2,6 +2,7 @@
 // محرك تصميم الانحناء والتسليح
 // الكود العربي السوري 2024 - ملحق 5
 // الطريقة الحدية (ULS) لحسابات الانحناء والتسليح
+// الرموز الكودية: f'_c, f_y, d, φ=0.9
 // ============================================================
 
 export interface FlexureInputs {
@@ -10,12 +11,12 @@ export interface FlexureInputs {
   L_footing: number;         // طول القاعدة (m)
   c_width: number;           // عرض العمود (m)
   c_depth: number;           // عمق العمود (m)
-  d_effective: number;       // العمق الفعال (m)
-  f_yk: number;              // إجهاد خضوع الفولاذ (MPa)
-  f_ck: number;              // المقاومة المميزة للخرسانة (MPa)
+  d_effective: number;       // الارتفاع الفعال d (m)
+  f_y: number;               // إجهاد الخضوع للفولاذ f_y (MPa)
+  f_c_prime: number;         // المقاومة الأسطوانية الإنشائية f'_c (MPa)
   isSteelColumn: boolean;
   basePlateDepth?: number;
-  barDiameterChosen: number; // القطر المختار (مثل 14)
+  barDiameterChosen: number; // القطر المختار (يجب ألا يقل عن 12mm) [بند 21]
 }
 
 export interface FlexureResults {
@@ -34,11 +35,11 @@ export interface FlexureResults {
 export function designFlexure(inputs: FlexureInputs): FlexureResults {
   const {
     P_ultimate, B_footing, L_footing, c_width, c_depth, d_effective,
-    f_yk, f_ck, isSteelColumn, basePlateDepth = 0, barDiameterChosen
+    f_y, f_c_prime, isSteelColumn, basePlateDepth = 0, barDiameterChosen
   } = inputs;
 
   // 1. تحديد موقع القطاع الحرج وحساب ذراع الظفر [بند 20]
-  let projection = 0; // طول الظفر الحرج (m)
+  let projection = 0;
   if (isSteelColumn) {
     // عمود معدني: عند منتصف المسافة بين وجه العمود وحافة الصفيحة القاعدة
     const mid_plate = (basePlateDepth + c_depth) / 2;
@@ -50,29 +51,29 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
 
   // 2. حساب العزم الأقصى الحدي (M_u) عند القطاع الحرج
   const net_soil_pressure_u = P_ultimate / (B_footing * L_footing);
-  const M_u = (net_soil_pressure_u * B_footing * Math.pow(projection, 2)) / 2; // kN.m
+  const M_u = (net_soil_pressure_u * B_footing * Math.pow(projection, 2)) / 2;
 
-  // 3. حساب التسليح بالطريقة الحدية (ULS) مع معامل خفض المقاومة (phi = 0.9)
+  // 3. حساب التسليح بالطريقة الحدية (ULS) مع معامل خفض المقاومة (φ = 0.9)
   const phi = 0.9;
   const b_width_mm = B_footing * 1000;
   const d_mm = d_effective * 1000;
 
   // حساب مساحة الحديد بالطريقة التقريبية الدقيقة لـ ULS
   const Rn = (M_u * Math.pow(10, 6)) / (phi * b_width_mm * Math.pow(d_mm, 2));
-  const m = f_yk / (0.85 * f_ck);
-  const discriminant = 1 - (2 * m * Rn) / f_yk;
+  const m = f_y / (0.85 * f_c_prime);
+  const discriminant = 1 - (2 * m * Rn) / f_y;
 
   let As_required = 0;
   if (discriminant >= 0) {
     const rho = (1 / m) * (1 - Math.sqrt(discriminant));
-    As_required = rho * b_width_mm * d_mm; // mm²
+    As_required = rho * b_width_mm * d_mm;
   } else {
     // المقاطع فوق المتوازن - يلزم زيادة سماكة الأساس
-    As_required = 0.05 * b_width_mm * d_mm; // تسليح عالي كإنذار
+    As_required = 0.05 * b_width_mm * d_mm;
   }
 
-  // 4. تطبيق شروط الحدود الدنيا للتسليح (Rho_min) [بند 9, 25]
-  const rho_min = f_yk >= 400 ? 0.0018 : 0.0020;
+  // 4. تطبيق شروط الحدود الدنيا للتسليح (ρ_min) [بند 9, 25]
+  const rho_min = f_y >= 400 ? 0.0018 : 0.0020;
   const As_minimum = rho_min * b_width_mm * d_mm;
 
   if (As_required < As_minimum) {
@@ -84,10 +85,10 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
   let bars_count = Math.ceil(As_required / single_bar_area);
   const As_provided = single_bar_area * bars_count;
 
-  // حساب التباعد بين الأسياخ (Spacing)
-  let spacing_mm = Math.floor((B_footing * 1000 - 2 * 50) / (bars_count - 1)); // 50mm غطاء جانبي
+  // حساب التباعد بين الأسياخ (Spacing) مع الغطاء الجانبي 50mm
+  let spacing_mm = Math.floor((B_footing * 1000 - 2 * 50) / (bars_count - 1));
 
-  // 6. التحقق من اشتراطات التباعد الصارمة للكود السوري (100mm <= spacing <= 200mm) [بند 21]
+  // 6. التحقق من اشتراطات التباعد الصارمة للكود السوري (100mm ≤ spacing ≤ 200mm) [بند 21]
   let isSpacingSafe = true;
   let detailingMessage = 'توزيع التسليح متوافق مع اشتراطات الملحق 5';
 
@@ -102,7 +103,7 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
 
   if (barDiameterChosen < 12) {
     isSpacingSafe = false;
-    detailingMessage += ' | القطر المختار أقل من 12 مم المسموح بها للأساسات الرئيسية!';
+    detailingMessage += ' | القطر المختار أقل من 12mm المسموح بها للأساسات الرئيسية!';
   }
 
   return {

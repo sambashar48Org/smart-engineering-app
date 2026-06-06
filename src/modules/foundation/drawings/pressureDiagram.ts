@@ -1,6 +1,7 @@
 // ============================================================
 // رسم توزيع الإجهاد تحت الأساس (Pressure Diagram)
 // الكود العربي السوري 2024 - يدعم الشد والتوزيع المثلثي
+// الرموز الكودية: σ₁, σ₂, q, q_magnified, t, D_f
 // ============================================================
 
 import type { FoundationInputs } from '@/stores/foundationStore';
@@ -17,7 +18,7 @@ export function drawPressureDiagram(
   customOpts: Partial<DrawOptions> = {}
 ) {
   const opts = { ...DEFAULT_DRAW_OPTIONS, ...customOpts };
-  const { width: B, length: L, loadCase, bearingCapacity: qAll } = inputs;
+  const { B, L, loadCase, q_allowable } = inputs;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -29,10 +30,10 @@ export function drawPressureDiagram(
     return;
   }
 
-  const { maxStress: qMax, minStress: qMin, allowableModified: qAllowable, hasTension, compressedLength } = results;
+  const { sigma_1, sigma_2, q_magnified, hasTension, compressedLength } = results;
 
   // حساب المقياس
-  const maxStress = Math.max(qMax, qAll) * 1.2;
+  const maxStress = Math.max(sigma_1, q_allowable) * 1.2;
   const margin = 70;
   const plotWidth = canvas.width - margin * 2;
   const plotHeight = canvas.height - margin * 2;
@@ -52,8 +53,8 @@ export function drawPressureDiagram(
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // ─── خط الإجهاد المسموح الاستاتيكي ───
-  const qAllY = baseY - qAll * scaleV;
+  // ─── خط الإجهاد المسموح الاستاتيكي q ───
+  const qAllY = baseY - q_allowable * scaleV;
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(baseX - 10, qAllY);
@@ -62,11 +63,11 @@ export function drawPressureDiagram(
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.setLineDash([]);
-  drawLabel(ctx, `q_all = ${qAll} kN/m²`, baseX + B * scaleH + 20, qAllY, opts);
+  drawLabel(ctx, `q = ${q_allowable} kN/m²`, baseX + B * scaleH + 20, qAllY, opts);
 
-  // ─── خط الإجهاد المسموح المعدّل ───
+  // ─── خط الإجهاد المسموح المكبر q_magnified ───
   if (loadCase !== 1) {
-    const qModY = baseY - qAllowable * scaleV;
+    const qModY = baseY - q_magnified * scaleV;
     ctx.setLineDash([6, 3]);
     ctx.beginPath();
     ctx.moveTo(baseX - 10, qModY);
@@ -77,14 +78,15 @@ export function drawPressureDiagram(
     ctx.setLineDash([]);
 
     const modLabel = loadCase === 3
-      ? `q_زلزال = ${qAllowable} kN/m²`
-      : `q_رياح = ${qAllowable} kN/m²`;
-    drawLabel(ctx, modLabel, baseX - 30, qModY, opts);
+      ? `q_زلزال = ${q_magnified} kN/m²`
+      : `q_رياح = ${q_magnified} kN/m²`;
+    // إزاحة 20px لأعلى لمنع تداخل النصوص
+    drawLabel(ctx, modLabel, baseX - 30, qModY - 20, opts);
   }
 
   // ─── شكل توزيع الإجهاد ───
-  const qMaxY = baseY - qMax * scaleV;
-  const qMinY = baseY - qMin * scaleV;
+  const q1Y = baseY - sigma_1 * scaleV; // σ₁ (الإجهاد الأكبر)
+  const q2Y = baseY - sigma_2 * scaleV; // σ₂ (الإجهاد الأصغر)
 
   if (hasTension) {
     // توزيع مثلثي مع منطقة شد
@@ -93,13 +95,13 @@ export function drawPressureDiagram(
     // المنطقة المضغوطة (مثلث)
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
-    ctx.lineTo(baseX + compressedWidth, qMaxY);
+    ctx.lineTo(baseX + compressedWidth, q1Y);
     ctx.lineTo(baseX + compressedWidth, baseY);
     ctx.closePath();
 
     // تلوين المنطقة المضغوطة
     const isSeismicSafe = compressedLength >= L / 2;
-    const gradient = ctx.createLinearGradient(baseX, qMaxY, baseX, baseY);
+    const gradient = ctx.createLinearGradient(baseX, q1Y, baseX, baseY);
     if (isSeismicSafe) {
       gradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
       gradient.addColorStop(1, 'rgba(34, 197, 94, 0.1)');
@@ -113,19 +115,19 @@ export function drawPressureDiagram(
     // حافة التوزيع
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
-    ctx.lineTo(baseX + compressedWidth, qMaxY);
+    ctx.lineTo(baseX + compressedWidth, q1Y);
     ctx.strokeStyle = isSeismicSafe ? '#16a34a' : '#dc2626';
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
     // منطقة الشد (تظليل أحمر)
     ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
-    ctx.fillRect(baseX + compressedWidth, baseY - (qMax * scaleV * 0.3), B * scaleH - compressedWidth, qMax * scaleV * 0.3 + 1);
+    ctx.fillRect(baseX + compressedWidth, baseY - (sigma_1 * scaleV * 0.3), B * scaleH - compressedWidth, sigma_1 * scaleV * 0.3 + 1);
 
     // خط الشد
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.moveTo(baseX + compressedWidth, qMaxY);
+    ctx.moveTo(baseX + compressedWidth, q1Y);
     ctx.lineTo(baseX + compressedWidth, baseY);
     ctx.strokeStyle = '#f87171';
     ctx.lineWidth = 1;
@@ -157,14 +159,14 @@ export function drawPressureDiagram(
     // توزيع شبه منحرف عادي
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
-    ctx.lineTo(baseX, qMinY);
-    ctx.lineTo(baseX + B * scaleH, qMaxY);
+    ctx.lineTo(baseX, q2Y);
+    ctx.lineTo(baseX + B * scaleH, q1Y);
     ctx.lineTo(baseX + B * scaleH, baseY);
     ctx.closePath();
 
     // تلوين المنطقة
-    const isSafe = qMax <= qAllowable;
-    const gradient = ctx.createLinearGradient(baseX, qMaxY, baseX, baseY);
+    const isSafe = sigma_1 <= q_allowable;
+    const gradient = ctx.createLinearGradient(baseX, q1Y, baseX, baseY);
     if (isSafe) {
       gradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
       gradient.addColorStop(1, 'rgba(34, 197, 94, 0.1)');
@@ -177,33 +179,33 @@ export function drawPressureDiagram(
 
     // حافة التوزيع
     ctx.beginPath();
-    ctx.moveTo(baseX, qMinY);
-    ctx.lineTo(baseX + B * scaleH, qMaxY);
+    ctx.moveTo(baseX, q2Y);
+    ctx.lineTo(baseX + B * scaleH, q1Y);
     ctx.strokeStyle = isSafe ? '#16a34a' : '#dc2626';
     ctx.lineWidth = 2.5;
     ctx.stroke();
   }
 
-  // ─── التسميات ───
+  // ─── التسميات الكودية ───
   if (hasTension) {
-    drawLabel(ctx, `q_max = ${qMax} kN/m²`, baseX + compressedLength * scaleH + 10, qMaxY, opts);
-    drawLabel(ctx, `q_min = 0 (شد)`, baseX - 10, baseY - 10, opts);
+    drawLabel(ctx, `σ₁ = ${sigma_1} kN/m²`, baseX + compressedLength * scaleH + 10, q1Y, opts);
+    drawLabel(ctx, `σ₂ = 0 (شد)`, baseX - 10, baseY - 10, opts);
   } else {
-    drawLabel(ctx, `q_min = ${qMin} kN/m²`, baseX - 10, qMinY, opts);
-    drawLabel(ctx, `q_max = ${qMax} kN/m²`, baseX + B * scaleH + 10, qMaxY, opts);
+    drawLabel(ctx, `σ₂ = ${sigma_2} kN/m²`, baseX - 10, q2Y, opts);
+    drawLabel(ctx, `σ₁ = ${sigma_1} kN/m²`, baseX + B * scaleH + 10, q1Y, opts);
   }
 
-  // نسبة الاستثمار
-  const ratioPercent = results.investmentRatio.toFixed(1);
-  const ratioColor = results.investmentRatio <= 80 ? '#16a34a' : results.investmentRatio <= 100 ? '#f59e0b' : '#dc2626';
+  // نسبة التحقق من إجهاد التربة (بدلاً من نسبة الاستثمار)
+  const ratioPercent = results.bearingVerificationRatio.toFixed(1);
+  const ratioColor = results.bearingVerificationRatio <= 80 ? '#16a34a' : results.bearingVerificationRatio <= 100 ? '#f59e0b' : '#dc2626';
 
   ctx.font = 'bold 16px Cairo, sans-serif';
   ctx.fillStyle = ratioColor;
   ctx.textAlign = 'center';
-  ctx.fillText(`نسبة الاستثمار: ${ratioPercent}%`, canvas.width / 2, margin / 2);
+  ctx.fillText(`نسبة التحقق من إجهاد التربة: ${ratioPercent}%`, canvas.width / 2, margin / 2);
 
   // ─── أبعاد العرض ───
-  drawDimensionLine(ctx, baseX, baseY + 15, baseX + B * scaleH, baseY + 15, `${B} m`, 25, opts);
+  drawDimensionLine(ctx, baseX, baseY + 15, baseX + B * scaleH, baseY + 15, `B = ${B} m`, 25, opts);
 
   // ─── مقياس رسم للإجهاد ───
   ctx.font = '12px Cairo, sans-serif';

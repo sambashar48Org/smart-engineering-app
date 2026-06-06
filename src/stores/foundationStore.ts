@@ -1,71 +1,72 @@
 // ============================================================
 // مخزن بيانات الأساسات - الكود العربي السوري 2024
+// الرموز الكودية: V, t, D_f, σ₁, σ₂, q_magnified, c_w, δ, f'_c, f_y
 // ============================================================
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { FoundationType, CheckResult, LoadCase } from '@/types';
 
-/** مدخلات الأساس */
+/** مدخلات الأساس - الرموز الكودية السورية */
 export interface FoundationInputs {
   // الأبعاد
   type: FoundationType;
-  width: number;       // B (m)
-  length: number;      // L (m)
-  depth: number;       // D (m)
-  thickness: number;   // h (m) - سماكة اللبشة
+  B: number;             // عرض الأساس (m)
+  L: number;             // طول الأساس (m)
+  D_f: number;           // منسوب التأسيس أو العمق (m)
+  t: number;             // سمك بلاطة الأساس (m)
 
-  // الأحمال التشغيلية (Service)
-  axialLoad: number;   // N (kN) - الحمل الشاقولي التشغيلي
-  momentX: number;     // Mx (kN.m)
-  momentY: number;     // My (kN.m)
-  horizontalForce: number; // H (kN)
+  // الأحمال التشغيلية المؤثرة (Service Loads)
+  V: number;             // الحمولة الشاقولية الكلية المؤثرة (kN)
+  M_x: number;           // العزم المركزي حول X (kN.m)
+  M_y: number;           // العزم المركزي حول Y (kN.m)
+  H: number;             // القوة الأفقية المنقولة من المنشأة (kN)
 
   // حالة التحميل الكودية السورية
-  loadCase: LoadCase;  // 1=دائمة، 2=رياح، 3=زلزال
+  loadCase: LoadCase;    // 1=دائمة، 2=رياح، 3=زلزال
 
   // التربة
-  bearingCapacity: number; // q_all (kN/m²) - إجهاد التربة المسموح الاستاتيكي
-  soilDensity: number;     // γ (kN/m³)
-  cohesion: number;        // cw (kN/m²) - تماسك التربة
-  deltaFriction: number;   // زاوية الاحتكاك (درجة)
-  E_passive: number;       // دفع التربة المنفعل (kN)
-  E_active: number;        // دفع التربة الفعال (kN)
-  U_uplift: number;        // قوة دفع الماء (kN)
+  q_allowable: number;   // إجهاد التحميل المسموح به للتربة (kN/m²)
+  soilDensity: number;   // كثافة التربة γ (kN/m³)
+  c_w: number;           // إجهاد التماسك بين التربة والأساس (kN/m²)
+  delta_friction: number;// زاوية الاحتكاك بين الأساس والتربة (درجة)
+  E_passive: number;     // دفع التربة المنفعل (kN)
+  E_active: number;      // دفع التربة الفعال (kN)
+  U_uplift: number;      // قوة دفع الماء (kN)
 
   // المواد
-  concreteGrade: string;   // e.g. 'C25/30'
-  steelGrade: string;      // e.g. 'B400'
-  cover: number;           // الغطاء الخرساني (mm)
+  concreteGrade: string; // فئة الخرسانة (المقاومة الأسطوانية الإنشائية f'_c)
+  steelGrade: string;    // فئة الحديد (إجهاد الخضوع f_y)
+  cover: number;         // سمك طبقة التغطية الخرسانية (mm)
 
   // العمود
-  columnWidth: number;     // (m)
-  columnDepth: number;     // (m)
-  isSteelColumn: boolean;  // هل العمود معدني؟
-  basePlateWidth: number;  // عرض الصفيحة المعدنية (m)
-  basePlateDepth: number;  // عمق الصفيحة المعدنية (m)
+  columnWidth: number;   // عرض العمود (m)
+  columnDepth: number;   // عمق العمود (m)
+  isSteelColumn: boolean;// هل العمود معدني؟
+  basePlateWidth: number;// عرض الصفيحة المعدنية (m)
+  basePlateDepth: number;// عمق الصفيحة المعدنية (m)
 
   // التسليح
-  barDiameterChosen: number; // القطر المختار (mm)
+  barDiameterChosen: number; // القطر المختار (mm) - لا يقل عن 12mm
 
   // معامل β
   betaEccentricity: number; // معامل تصعيد اللامركزية
 }
 
-/** نتائج حسابات الأساس - الكود السوري */
+/** نتائج حسابات الأساس - الرموز الكودية السورية */
 export interface FoundationResults {
-  // إجهاد التربة
-  maxStress: number;           // q_max (kN/m²)
-  minStress: number;           // q_min (kN/m²)
-  allowableModified: number;   // q_allowable_modified (kN/m²)
-  hasTension: boolean;         // هل يوجد شد؟
-  bearingSafe: boolean;        // هل إجهاد التربة آمن؟
-  investmentRatio: number;     // نسبة الاستثمار (%)
-  e_L: number;                 // اللامركزية باتجاه L (m)
-  e_B: number;                 // اللامركزية باتجاه B (m)
-  compressedLength: number;    // طول المنطقة المضغوطة (m)
+  // إجهاد التربة (SLS)
+  sigma_1: number;              // الإجهاد الأكبر عند حواف الأساس (kN/m²)
+  sigma_2: number;              // الإجهاد الأصغر عند حواف الأساس (kN/m²)
+  q_magnified: number;          // إجهاد التحميل المسموح المكبر (kN/m²)
+  hasTension: boolean;          // هل يوجد شد (انفصال جزئي)؟
+  bearingSafe: boolean;         // هل إجهاد التربة آمن؟
+  bearingVerificationRatio: number; // نسبة التحقق من إجهاد التربة (%)
+  e_L: number;                  // اللامركزية باتجاه L (m)
+  e_B: number;                  // اللامركزية باتجاه B (m)
+  compressedLength: number;     // طول المنطقة المضغوطة (m)
 
-  // الاستقرار
+  // الاستقرار (SLS)
   overturningSafe: boolean;
   slidingSafe: boolean;
   buoyancySafe: boolean;
@@ -73,7 +74,7 @@ export interface FoundationResults {
   fs_sliding: number;
   fs_buoyancy: number;
 
-  // القص
+  // القص (ULS)
   oneWayShearSafe: boolean;
   punchingShearSafe: boolean;
   v_max_one_way: number;
@@ -81,8 +82,8 @@ export interface FoundationResults {
   v_max_punching: number;
   v_concrete_punching: number;
 
-  // الانحناء والتسليح
-  M_u: number;                 // العزم المصعد (kN.m)
+  // الانحناء والتسليح (ULS)
+  M_u: number;
   bottomRebarX: { diameter: number; spacing: number; count: number; areaProvided: number; areaRequired: number };
   bottomRebarY: { diameter: number; spacing: number; count: number; areaProvided: number; areaRequired: number };
   topRebarX: { diameter: number; spacing: number; count: number; areaProvided: number; areaRequired: number };
@@ -110,19 +111,19 @@ interface FoundationState {
 
 const defaultInputs: FoundationInputs = {
   type: 'isolated',
-  width: 2.5,
-  length: 3.0,
-  depth: 0.6,
-  thickness: 0.4,
-  axialLoad: 450,
-  momentX: 30,
-  momentY: 15,
-  horizontalForce: 25,
+  B: 2.5,
+  L: 3.0,
+  D_f: 0.6,
+  t: 0.4,
+  V: 450,
+  M_x: 30,
+  M_y: 15,
+  H: 25,
   loadCase: 1,
-  bearingCapacity: 250,
+  q_allowable: 250,
   soilDensity: 18,
-  cohesion: 15,
-  deltaFriction: 25,
+  c_w: 15,
+  delta_friction: 25,
   E_passive: 0,
   E_active: 0,
   U_uplift: 0,
@@ -139,12 +140,12 @@ const defaultInputs: FoundationInputs = {
 };
 
 const defaultResults: FoundationResults = {
-  maxStress: 0,
-  minStress: 0,
-  allowableModified: 0,
+  sigma_1: 0,
+  sigma_2: 0,
+  q_magnified: 0,
   hasTension: false,
   bearingSafe: false,
-  investmentRatio: 0,
+  bearingVerificationRatio: 0,
   e_L: 0,
   e_B: 0,
   compressedLength: 0,
@@ -188,7 +189,7 @@ export const useFoundationStore = create<FoundationState>()(
       resetAll: () => set({ inputs: { ...defaultInputs }, results: { ...defaultResults } }),
     }),
     {
-      name: 'smart-engineering-foundation-v2',
+      name: 'smart-engineering-foundation-v3',
     }
   )
 );

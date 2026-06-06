@@ -1,5 +1,6 @@
 // ============================================================
 // لوحة نتائج الأساسات - الكود العربي السوري 2024
+// الرموز الكودية: σ₁, σ₂, q_magnified, Base-PSR, F_s
 // ============================================================
 
 import React from 'react';
@@ -33,11 +34,11 @@ export default function ResultsPanel() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
-              {lang === 'ar' ? 'الإجهاد الأقصى q_max' : 'Max Stress q_max'}
+              {lang === 'ar' ? 'الإجهاد الأكبر σ₁' : 'Max Stress σ₁'}
             </span>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold">
-                {results.maxStress} <span className="text-xs text-gray-400">kN/m²</span>
+                {results.sigma_1} <span className="text-xs text-gray-400">kN/m²</span>
               </span>
               <StatusBadge status={results.bearingSafe ? 'pass' : 'fail'} lang={lang} />
             </div>
@@ -45,19 +46,19 @@ export default function ResultsPanel() {
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
-              {lang === 'ar' ? 'الإجهاد الأدنى q_min' : 'Min Stress q_min'}
+              {lang === 'ar' ? 'الإجهاد الأصغر σ₂' : 'Min Stress σ₂'}
             </span>
             <span className="text-sm font-mono">
-              {results.minStress} <span className="text-xs text-gray-400">kN/m²</span>
+              {results.sigma_2} <span className="text-xs text-gray-400">kN/m²</span>
             </span>
           </div>
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">
-              {lang === 'ar' ? 'الإجهاد المسموح المعدّل' : 'Modified Allowable'}
+              {lang === 'ar' ? 'إجهاد التحميل المسموح المكبر' : 'Magnified Allowable'}
             </span>
             <span className="text-sm font-mono">
-              {results.allowableModified} <span className="text-xs text-gray-400">kN/m²</span>
+              {results.q_magnified} <span className="text-xs text-gray-400">kN/m²</span>
             </span>
           </div>
 
@@ -69,26 +70,28 @@ export default function ResultsPanel() {
             </div>
           )}
 
-          {/* نسبة الاستثمار */}
+          {/* نسبة التحقق من إجهاد التربة */}
           <div className="mt-2">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-500">{t('result.utilization', lang)}</span>
+              <span className="text-xs text-gray-500">
+                {lang === 'ar' ? 'نسبة التحقق من إجهاد التربة' : 'Bearing Verification Ratio'}
+              </span>
               <span className={`text-xs font-bold ${
-                results.investmentRatio <= 80 ? 'text-green-600' :
-                results.investmentRatio <= 100 ? 'text-yellow-600' :
+                results.bearingVerificationRatio <= 80 ? 'text-green-600' :
+                results.bearingVerificationRatio <= 100 ? 'text-yellow-600' :
                 'text-red-600'
               }`}>
-                {results.investmentRatio.toFixed(1)}%
+                {results.bearingVerificationRatio.toFixed(1)}%
               </span>
             </div>
             <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  results.investmentRatio <= 80 ? 'bg-green-500' :
-                  results.investmentRatio <= 100 ? 'bg-yellow-500' :
+                  results.bearingVerificationRatio <= 80 ? 'bg-green-500' :
+                  results.bearingVerificationRatio <= 100 ? 'bg-yellow-500' :
                   'bg-red-500'
                 }`}
-                style={{ width: `${Math.min(results.investmentRatio, 100)}%` }}
+                style={{ width: `${Math.min(results.bearingVerificationRatio, 100)}%` }}
               />
             </div>
           </div>
@@ -99,19 +102,19 @@ export default function ResultsPanel() {
       <Card title={lang === 'ar' ? 'الاستقرار والثبات' : 'Stability Checks'}>
         <div className="space-y-3">
           <StabilityRow
-            label={lang === 'ar' ? 'معامل أمان الانقلاب' : 'Overturning FS'}
+            label={lang === 'ar' ? 'درجة الاستقرار ضد الانقلاب (Base-PSR)' : 'Overturning Stability (Base-PSR)'}
             value={results.fs_overturning}
             safe={results.overturningSafe}
             lang={lang}
           />
           <StabilityRow
-            label={lang === 'ar' ? 'معامل أمان الانزلاق' : 'Sliding FS'}
+            label={lang === 'ar' ? 'معامل الأمان من الانزلاق (F_s)' : 'Sliding Safety Factor (F_s)'}
             value={results.fs_sliding}
             safe={results.slidingSafe}
             lang={lang}
           />
           <StabilityRow
-            label={lang === 'ar' ? 'معامل أمان التعويم' : 'Buoyancy FS'}
+            label={lang === 'ar' ? 'معامل الأمان من التعويم' : 'Buoyancy Safety Factor'}
             value={results.fs_buoyancy}
             safe={results.buoyancySafe}
             lang={lang}
@@ -123,14 +126,14 @@ export default function ResultsPanel() {
       <Card title={lang === 'ar' ? 'تحققات القص' : 'Shear Checks'}>
         <div className="space-y-3">
           <ShearRow
-            label={lang === 'ar' ? 'القص أحادي الاتجاه' : 'One-Way Shear'}
+            label={lang === 'ar' ? 'التحقق من جهد القص بالقطاع الحرج' : 'One-Way Shear Verification'}
             vMax={results.v_max_one_way}
             vRd={results.v_concrete_one_way}
             safe={results.oneWayShearSafe}
             lang={lang}
           />
           <ShearRow
-            label={lang === 'ar' ? 'القص الثاقب' : 'Punching Shear'}
+            label={lang === 'ar' ? 'التحقق من إجهاد الثقب للخرسانة' : 'Punching Shear Verification'}
             vMax={results.v_max_punching}
             vRd={results.v_concrete_punching}
             safe={results.punchingShearSafe}
@@ -198,9 +201,9 @@ export default function ResultsPanel() {
         {/* رسالة التفصيل */}
         {results.flexureMessage && (
           <div className={`mt-3 p-2 rounded-lg text-xs ${
-            results.flexureMessage.includes('❌') || results.flexureMessage.includes('أقل')
+            results.flexureMessage.includes('أقل') || results.flexureMessage.includes('فشل')
               ? 'bg-red-50 text-red-700 border border-red-200'
-              : results.flexureMessage.includes('⚠') || results.flexureMessage.includes('تقييد')
+              : results.flexureMessage.includes('تقييد') || results.flexureMessage.includes('تم تقييد')
               ? 'bg-amber-50 text-amber-700 border border-amber-200'
               : 'bg-green-50 text-green-700 border border-green-200'
           }`}>

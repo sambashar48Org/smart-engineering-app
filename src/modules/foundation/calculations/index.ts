@@ -1,12 +1,13 @@
 // ============================================================
 // محرك حسابات الأساسات - نقطة الدخول الرئيسية
 // الكود العربي السوري 2024 - ملحق 5
+// الرموز الكودية: V, t, D_f, σ₁, σ₂, q_magnified, f'_c, f_y, c_w, δ
 // ============================================================
 
 import type { FoundationInputs, FoundationResults } from '@/stores/foundationStore';
 import type { CheckResult, CheckStatus } from '@/types';
 import { SYRIAN_CONCRETE_GRADES, SYRIAN_STEEL_GRADES } from '@/types';
-import { calculateSoilStresses } from './bearingCapacity';
+import { calculateSyrianSoilStresses } from './bearingCapacity';
 import { checkStability } from './stabilityCheck';
 import { calculateShearAndPunching } from './punchingShear';
 import { designFlexure } from './flexureDesign';
@@ -14,10 +15,10 @@ import { designFlexure } from './flexureDesign';
 /** حساب كامل للأساس وفق الكود العربي السوري */
 export function calculateFoundation(inputs: FoundationInputs): FoundationResults {
   const {
-    width: B, length: L, depth: D, thickness: h,
-    axialLoad: N, momentX: Mx, momentY: My, horizontalForce: H,
-    loadCase, bearingCapacity: qAll, soilDensity: gamma,
-    cohesion, deltaFriction, E_passive, E_active, U_uplift,
+    B, L, D_f, t,
+    V, M_x, M_y, H,
+    loadCase, q_allowable, soilDensity: gamma,
+    c_w, delta_friction, E_passive, E_active, U_uplift,
     concreteGrade, steelGrade, cover,
     columnWidth: c1, columnDepth: c2,
     isSteelColumn, basePlateWidth, basePlateDepth,
@@ -25,32 +26,32 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   } = inputs;
 
   // ── قيم المواد ──
-  const f_ck = SYRIAN_CONCRETE_GRADES[concreteGrade] ?? 25;
-  const f_yk = SYRIAN_STEEL_GRADES[steelGrade] ?? 400;
+  const f_c_prime = SYRIAN_CONCRETE_GRADES[concreteGrade] ?? 25; // المقاومة الأسطوانية الإنشائية f'_c
+  const f_y = SYRIAN_STEEL_GRADES[steelGrade] ?? 400;             // إجهاد الخضوع f_y
 
-  // ── العمق الفعال (m) ──
-  const d_effective = (h * 1000 - cover - 10) / 1000; // cover بالـ mm
+  // ── الارتفاع الفعال d (m) ──
+  const d_effective = (t * 1000 - cover - 10) / 1000; // cover بالـ mm
 
   // ── وزن الأساس والتربة ──
-  const foundationWeight = B * L * h * 24; // خرسانة 24 kN/m³
-  const soilWeight = B * L * (D - h) * gamma;
-  const totalVerticalService = N + foundationWeight + soilWeight;
+  const foundationWeight = B * L * t * 24; // خرسانة 24 kN/m³
+  const soilWeight = B * L * (D_f - t) * gamma;
+  const totalVerticalService = V + foundationWeight + soilWeight;
 
   // ══════════════════════════════════════
   // 1. حساب إجهاد التربة (SLS - تشغيلي)
   // ══════════════════════════════════════
-  const soilResults = calculateSoilStresses({
+  const soilResults = calculateSyrianSoilStresses({
     B, L,
-    P: totalVerticalService,
-    Mx, My,
-    q_all: qAll,
+    V: totalVerticalService,
+    M_x, M_y,
+    q_allowable,
     loadCase,
   });
 
   // ══════════════════════════════════════
   // 2. تحققات الاستقرار (SLS - تشغيلي)
   // ══════════════════════════════════════
-  const M_overturning = Mx + H * D; // عزم القلب
+  const M_overturning = M_x + H * D_f; // عزم القلب
   const M_stabilizing = totalVerticalService * (B / 2); // عزم التثبيت
 
   const stabilityResults = checkStability({
@@ -59,8 +60,8 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     H_driving: H,
     Q_vertical_total: totalVerticalService,
     A_base: B * L,
-    cohesion,
-    delta_friction: deltaFriction,
+    c_w,
+    delta_friction,
     E_passive,
     E_active,
     U_uplift,
@@ -71,17 +72,16 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // 3. القص والقص الثاقب (ULS - حدّي)
   // ══════════════════════════════════════
   // تصعيد الحمولات للطريقة الحدية
-  const P_ultimate = N * 1.35 + foundationWeight * 1.35; // تبسيط
-  const M_ultimate_x = Mx * 1.35;
+  const P_ultimate = V * 1.35 + foundationWeight * 1.35; // تبسيط
 
   const shearResults = calculateShearAndPunching({
-    P_ultimate: P_ultimate,
+    P_ultimate,
     B_footing: B,
     L_footing: L,
     c_width: c1,
     c_depth: c2,
     d_effective,
-    f_ck,
+    f_c_prime,
     beta_eccentricity: betaEccentricity,
     isSteelColumn,
     basePlateWidth,
@@ -99,8 +99,8 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     c_width: c1,
     c_depth: c2,
     d_effective,
-    f_yk,
-    f_ck,
+    f_y,
+    f_c_prime,
     isSteelColumn,
     basePlateDepth,
     barDiameterChosen,
@@ -109,20 +109,20 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // تسليح اتجاه Y (العرض)
   const flexureY = designFlexure({
     P_ultimate,
-    B_footing: L,  // نعكس الأبعاد للاتجاه الآخر
+    B_footing: L,
     L_footing: B,
     c_width: c2,
     c_depth: c1,
     d_effective,
-    f_yk,
-    f_ck,
+    f_y,
+    f_c_prime,
     isSteelColumn,
     basePlateDepth,
     barDiameterChosen,
   });
 
   // تسليح علوي أدنى (انكماش)
-  const rhoMin = f_yk >= 400 ? 0.0018 : 0.0020;
+  const rhoMin = f_y >= 400 ? 0.0018 : 0.0020;
   const AsMinX = rhoMin * (B * 1000) * (d_effective * 1000);
   const AsMinY = rhoMin * (L * 1000) * (d_effective * 1000);
   const topBarArea = (Math.PI * barDiameterChosen * barDiameterChosen) / 4;
@@ -137,16 +137,16 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   const checks: CheckResult[] = [
     makeCheck(
       'Bearing Capacity',
-      'إجهاد التربة',
-      soilResults.q_max,
-      soilResults.q_allowable_modified,
+      'نسبة التحقق من إجهاد التربة',
+      soilResults.sigma_1,
+      soilResults.q_magnified,
       'kN/m²',
       soilResults.isSafe,
       soilResults.statusMessage
     ),
     makeCheck(
       'Overturning Stability',
-      'استقرار الانقلاب',
+      'درجة الاستقرار ضد الانقلاب (Base-PSR)',
       stabilityResults.fs_overturning,
       stabilityResults.limit_overturning,
       'FS',
@@ -154,7 +154,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     ),
     makeCheck(
       'Sliding Stability',
-      'استقرار الانزلاق',
+      'معامل الأمان من الانزلاق (F_s)',
       stabilityResults.fs_sliding,
       stabilityResults.limit_sliding,
       'FS',
@@ -162,7 +162,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     ),
     makeCheck(
       'Buoyancy Safety',
-      'أمان التعويم',
+      'معامل الأمان من التعويم',
       stabilityResults.fs_buoyancy,
       stabilityResults.limit_buoyancy,
       'FS',
@@ -170,7 +170,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     ),
     makeCheck(
       'One-Way Shear',
-      'القص أحادي الاتجاه',
+      'التحقق من جهد القص بالقطاع الحرج',
       shearResults.v_max_one_way,
       shearResults.v_concrete_one_way,
       'MPa',
@@ -178,7 +178,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     ),
     makeCheck(
       'Punching Shear',
-      'القص الثاقب',
+      'التحقق من إجهاد الثقب للخرسانة',
       shearResults.v_max_punching,
       shearResults.v_concrete_punching,
       'MPa',
@@ -188,12 +188,12 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
 
   return {
     // إجهاد التربة
-    maxStress: soilResults.q_max,
-    minStress: soilResults.q_min,
-    allowableModified: soilResults.q_allowable_modified,
+    sigma_1: soilResults.sigma_1,
+    sigma_2: soilResults.sigma_2,
+    q_magnified: soilResults.q_magnified,
     hasTension: soilResults.hasTension,
     bearingSafe: soilResults.isSafe,
-    investmentRatio: soilResults.investmentRatio,
+    bearingVerificationRatio: soilResults.bearingVerificationRatio,
     e_L: soilResults.e_L,
     e_B: soilResults.e_B,
     compressedLength: soilResults.compressedLength,
