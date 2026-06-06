@@ -32,6 +32,9 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   } = inputs;
 
   // ── تصنيف النوع ──
+  // منفرد/مستمر: تسليح سفلي فقط، بدون علوي (ظفر القاعدة الصاعد)
+  // مشترك: شبكة علوية كاملة لمقاومة العزم السالب بين العمودين
+  // حصيرة: شبكتان كاملتان + تحقق جساءة [بند 11]
   const isRaftOrCombined = type === 'mat' || type === 'combined';
   const isIsolatedOrStrip = type === 'isolated' || type === 'continuous';
 
@@ -141,21 +144,31 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
 
   if (isIsolatedOrStrip) {
     // ═══ منفرد/مستمر: إلغاء كامل للتسليح العلوي ═══
+    // الأساس المنفرد والمستمر تحت الجدران يعمل ككنسة بظفر صاعد
+    // لا توجد عزوم سلبية تتطلب تسليحاً علويّاً
     topRebarRequired = false;
     topRebarMessage = 'غير مطلوب إنشائياً كودياً (توفير هدر)';
     // topRebarX و topRebarY يبقيان NO_REBAR (diameter=0)
   } else if (isRaftOrCombined) {
     // ═══ حصيرة/مشترك: شبكتان كاملتان مستمرتان ═══
     topRebarRequired = true;
-    topRebarMessage = 'شبكة علوية مستمرة لمقاومة العزوم السلبية بين الأعمدة والمجازات [بند 9]';
+
+    if (type === 'combined') {
+      // المشترك: شبكة علوية كاملة ومحسوبة لمقاومة العزم السالب بين العمودين
+      topRebarMessage = 'شبكة علوية كاملة لمقاومة العزم السالب بين العمودين [بند 9]';
+    } else {
+      // الحصيرة: شبكتان بكامل الطاقة الإنشائية + ملاحظة شريحة العمود
+      topRebarMessage = 'شبكة علوية كاملة بكامل طاقتها الإنشائية + يُضاف تسليح إضافي علوي فوق الأعمدة (شريحة العمود) [بند 9]';
+    }
 
     const topX = designRaftTopRebar({
       B_footing: B,
       L_footing: L,
       d_effective,
       f_y,
+      f_c_prime,
       barDiameterChosen,
-      M_u_bottom: flexureX.M_u,
+      M_u_full: flexureX.M_u,
     });
 
     const topY = designRaftTopRebar({
@@ -163,8 +176,9 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
       L_footing: B,
       d_effective,
       f_y,
+      f_c_prime,
       barDiameterChosen,
-      M_u_bottom: flexureY.M_u,
+      M_u_full: flexureY.M_u,
     });
 
     topRebarX = {
@@ -321,6 +335,12 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     // المنطق الذكي
     topRebarRequired,
     topRebarMessage,
+
+    // ملاحظة شريحة العمود (للحصيرة فقط)
+    columnStripNote: type === 'mat' ? 'يُضاف تسليح إضافي علوي فوق الأعمدة (شريحة العمود)' : '',
+
+    // تنبيه تراكيب الأحمال الديناميكية
+    loadCaseWarning: soilResults.loadCaseWarning,
 
     // جساءة الحصيرة
     raftStiffnessCheck,

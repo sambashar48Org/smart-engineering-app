@@ -97,6 +97,16 @@ export default function FoundationForm() {
             </button>
           ))}
         </div>
+        {/* تنبيه تراكيب الأحمال الديناميكية */}
+        {(inputs.loadCase === 2 || inputs.loadCase === 3) && (
+          <div className="p-2 bg-amber-50 rounded-lg border border-amber-300">
+            <p className="text-xs font-semibold text-amber-700 leading-relaxed">
+              {lang === 'ar'
+                ? '⚠ يجب إدخال قيم العزوم (M_x, M_y) والقوى الأفقية (H) المصاحبة لحالة التحميل الديناميكية لضمان صحة توزيع الإجهادات σ₁ و σ₂'
+                : '⚠ You must enter moments (M_x, M_y) and horizontal forces (H) for this dynamic load case to ensure correct stress distribution σ₁ and σ₂'}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* الأبعاد */}

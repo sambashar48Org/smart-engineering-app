@@ -97,6 +97,12 @@ export interface FoundationResults {
   topRebarRequired: boolean;
   topRebarMessage: string;
 
+  // ملاحظة شريحة العمود (للحصيرة فقط)
+  columnStripNote: string;
+
+  // تنبيه تراكيب الأحمال الديناميكية
+  loadCaseWarning: string;
+
   // تحقق جساءة الحصيرة [بند 11]
   raftStiffnessCheck?: {
     isRigid: boolean;
@@ -187,6 +193,8 @@ const defaultResults: FoundationResults = {
   topRebarY: { ...NO_REBAR },
   topRebarRequired: false,
   topRebarMessage: '',
+  columnStripNote: '',
+  loadCaseWarning: '',
   checks: [],
   bearingMessage: '',
   flexureMessage: '',
@@ -210,7 +218,7 @@ export const useFoundationStore = create<FoundationState>()(
       resetAll: () => set({ inputs: { ...defaultInputs }, results: { ...defaultResults } }),
     }),
     {
-      name: 'smart-engineering-foundation-v4',
+      name: 'smart-engineering-foundation-v5',
     }
   )
 );

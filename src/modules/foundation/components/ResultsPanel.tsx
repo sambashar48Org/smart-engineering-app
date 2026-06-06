@@ -32,9 +32,25 @@ export default function ResultsPanel() {
 
   const isIsolatedOrStrip = inputs.type === 'isolated' || inputs.type === 'continuous';
   const isRaft = inputs.type === 'mat';
+  const isCombined = inputs.type === 'combined';
+  const isDynamicLoad = inputs.loadCase === 2 || inputs.loadCase === 3;
 
   return (
     <div className="space-y-4 overflow-y-auto h-full p-1">
+      {/* تنبيه تراكيب الأحمال الديناميكية */}
+      {isDynamicLoad && results.loadCaseWarning && (
+        <div className="p-3 bg-amber-50 rounded-lg border-2 border-amber-300">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-bold text-amber-800">
+              {lang === 'ar' ? '⚠ تنبيه تراكيب الأحمال' : '⚠ Load Combination Warning'}
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-amber-700 leading-relaxed">
+            {results.loadCaseWarning}
+          </p>
+        </div>
+      )}
+
       {/* ملخص إجهاد التربة */}
       <Card title={lang === 'ar' ? 'إجهاد التربة' : 'Soil Bearing'}>
         <div className="space-y-3">
@@ -230,7 +246,27 @@ export default function ResultsPanel() {
               />
               {results.topRebarMessage && (
                 <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-700">{results.topRebarMessage}</p>
+                  <p className="text-xs text-blue-700 leading-relaxed">{results.topRebarMessage}</p>
+                </div>
+              )}
+              {/* ملاحظة شريحة العمود (للحصيرة فقط) */}
+              {isRaft && results.columnStripNote && (
+                <div className="p-2 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="text-xs text-purple-700 font-semibold leading-relaxed">
+                    {lang === 'ar'
+                      ? results.columnStripNote
+                      : 'Additional top reinforcement shall be added over columns (column strip)'}
+                  </p>
+                </div>
+              )}
+              {/* ملاحظة خاصة بالأساس المشترك */}
+              {isCombined && (
+                <div className="p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <p className="text-xs text-indigo-700 font-semibold leading-relaxed">
+                    {lang === 'ar'
+                      ? 'الأساس المشترك يفرض كودياً وجود شبكة علوية كاملة لمقاومة العزم السالب بين العمودين'
+                      : 'Combined footing requires full top mesh to resist negative moment between columns per code'}
+                  </p>
                 </div>
               )}
             </>

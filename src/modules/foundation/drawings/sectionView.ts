@@ -204,7 +204,11 @@ export function drawFoundationSection(
       }
 
       // تسمية التسليح العلوي
-      drawLabel(ctx, 'غطاء علوي', centerX + bPx / 2 + 5, topRebarY - 10, opts);
+      if (inputs.type === 'combined') {
+        drawLabel(ctx, 'شبكة علوية (عزم سالب بين العمودين)', centerX + bPx / 2 + 5, topRebarY - 10, opts);
+      } else {
+        drawLabel(ctx, 'شبكة علوية كاملة + شريحة العمود', centerX + bPx / 2 + 5, topRebarY - 10, opts);
+      }
     }
     // منفرد/مستمر: لا نرسم أي شيء علوي - التسليح السفلي فقط (الفرش والغطاء)
   }

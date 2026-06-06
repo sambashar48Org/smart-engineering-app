@@ -56,6 +56,12 @@ const translations: Record<string, Record<Lang, string>> = {
   'loadCase.1': { ar: 'أحمال دائمة + حية', en: 'Dead + Live' },
   'loadCase.2': { ar: 'أحمال + رياح', en: 'Loads + Wind' },
   'loadCase.3': { ar: 'أحمال + زلزال', en: 'Loads + Seismic' },
+  'loadCase.warning': { ar: '⚠ يجب إدخال قيم العزوم والقوى الأفقية المصاحبة لحالة التحميل الديناميكية لضمان صحة توزيع الإجهادات σ₁ و σ₂', en: '⚠ You must enter moments and horizontal forces for this dynamic load case to ensure correct stress distribution σ₁ and σ₂' },
+
+  // ملاحظات التسليح
+  'rebar.topNotRequired': { ar: 'غير مطلوب إنشائياً كودياً (توفير هدر)', en: 'Not required structurally per code (material savings)' },
+  'rebar.columnStrip': { ar: 'يُضاف تسليح إضافي علوي فوق الأعمدة (شريحة العمود)', en: 'Additional top reinforcement shall be added over columns (column strip)' },
+  'rebar.combinedTopMesh': { ar: 'الأساس المشترك يفرض كودياً وجود شبكة علوية كاملة لمقاومة العزم السالب بين العمودين', en: 'Combined footing requires full top mesh to resist negative moment between columns per code' },
 
   // النتائج - الرموز الكودية السورية
   'result.bearingStress': { ar: 'إجهاد التربة', en: 'Bearing Stress' },

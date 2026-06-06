@@ -133,36 +133,42 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
 
 /**
  * تصميم التسليح العلوي للحصيرة/المشترك
- * شبكة علوية كاملة مستمرة لمقاومة العزوم المستمرة بين الأعمدة والمجازات
+ * شبكة علوية كاملة مستمرة لمقاومة العزوم السلبية فوق الأعمدة وبينها
  * تباعد أقصى 250mm، قطر أدنى 12mm [بند 9]
+ *
+ * ملاحظة هندسية: العزوم السلبية (العلوية) فوق الأعمدة في الحصائر أكبر
+ * من العزوم الإيجابية السفلية، لذا تُحسب الشبكتان بكامل طاقتهما الإنشائية
+ * بدون أي تخفيض. As_min أرضية أساسية للشبكتين لتقييد التشقق.
+ * يُضاف تسليح إضافي علوي فوق الأعمدة (شريحة العمود) حسب الحاجة.
  */
 export function designRaftTopRebar(inputs: {
   B_footing: number;
   L_footing: number;
   d_effective: number;
   f_y: number;
+  f_c_prime: number;       // المقاومة الأسطوانية الإنشائية f'_c (MPa) - تُمرر فعلياً
   barDiameterChosen: number;
-  M_u_bottom: number; // العزم السفلي لتقدير العلوي
-}): { spacing_mm: number; count: number; areaProvided: number; areaRequired: number; diameter: number } {
-  const { B_footing, L_footing, d_effective, f_y, barDiameterChosen, M_u_bottom } = inputs;
+  M_u_full: number;        // العزم الكامل (سفلي) - تُحسب الشبكة العلوية بنفس الطاقة
+}): { spacing_mm: number; count: number; areaProvided: number; areaRequired: number; diameter: number; columnStripNote: string } {
+  const { B_footing, L_footing, d_effective, f_y, f_c_prime, barDiameterChosen, M_u_full } = inputs;
 
-  // تقدير العزم العلوي السلبي كنسبة من العزم السفلي الإيجابي
-  // في الحصيرة: العزم السلبي فوق الأعمدة ≈ 0.5-0.7 من العزم الإيجابي
-  const M_u_top = M_u_bottom * 0.65;
+  // ═══ لا تخفيض: العزم العلوي = العزم الكامل ═══
+  // العزوم السلبية فوق الأعمدة أكبر من السفلية،
+  // لذا تُصمم الشبكة العلوية بكامل طاقتها الإنشائية
+  const M_u_top = M_u_full; // بدون أي نسبة تخفيض (إلغاء 0.65 السابقة)
 
   const b_width_mm = B_footing * 1000;
   const d_mm = d_effective * 1000;
 
-  // حساب التسليح العلوي
+  // حساب التسليح العلوي - As_min كأرضية أساسية لتقييد التشقق
   const rho_min = f_y >= 400 ? 0.0018 : 0.0020;
   const As_minimum = rho_min * b_width_mm * d_mm;
 
   let As_required = As_minimum;
   if (M_u_top > 0) {
     const phi = 0.9;
-    const f_c_prime_est = 25; // تقدير
     const Rn = (M_u_top * 1e6) / (phi * b_width_mm * d_mm * d_mm);
-    const m_ratio = f_y / (0.85 * f_c_prime_est);
+    const m_ratio = f_y / (0.85 * f_c_prime); // استخدام f'_c الفعلي بدلاً من تقدير
     const disc = 1 - (2 * m_ratio * Rn) / f_y;
     if (disc >= 0) {
       const rho = (1 / m_ratio) * (1 - Math.sqrt(disc));
@@ -186,5 +192,6 @@ export function designRaftTopRebar(inputs: {
     count,
     areaProvided: single_bar_area * count,
     areaRequired: As_required,
+    columnStripNote: 'يُضاف تسليح إضافي علوي فوق الأعمدة (شريحة العمود)',
   };
 }

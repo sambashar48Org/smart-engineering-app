@@ -26,6 +26,7 @@ export interface SoilResults {
   e_B: number;                  // اللامركزية باتجاه العرض (m)
   compressedLength: number;     // طول المنطقة المضغوطة (m)
   statusMessage: string;        // رسالة الحالة
+  loadCaseWarning: string;      // تنبيه تراكيب الأحمال الديناميكية
 }
 
 /** حساب إجهاد التربة وفق الكود العربي السوري - ملحق 5 */
@@ -87,6 +88,15 @@ export function calculateSyrianSoilStresses(inputs: SoilInputs): SoilResults {
 
   const bearingVerificationRatio = q_magnified > 0 ? (sigma_1 / q_magnified) * 100 : 0;
 
+  // 5. تنبيه تراكيب الأحمال الديناميكية
+  // يجب على المهندس إدخال قيم العزوم والقوى الأفقية المصاحبة
+  let loadCaseWarning = '';
+  if (loadCase === 2) {
+    loadCaseWarning = 'يجب على المهندس إدخال قيم العزوم (M_x, M_y) والقوى الأفقية (H) المصاحبة لحالة الرياح لضمان صحة توزيع الإجهادات σ₁ و σ₂';
+  } else if (loadCase === 3) {
+    loadCaseWarning = 'يجب على المهندس إدخال قيم العزوم (M_x, M_y) والقوى الأفقية (H) المصاحبة لحالة الزلزال لضمان صحة توزيع الإجهادات σ₁ و σ₂';
+  }
+
   return {
     sigma_1: Number(sigma_1.toFixed(2)),
     sigma_2: Number(sigma_2.toFixed(2)),
@@ -98,5 +108,6 @@ export function calculateSyrianSoilStresses(inputs: SoilInputs): SoilResults {
     e_B: Number(e_B.toFixed(4)),
     compressedLength: Number(compressedLength.toFixed(3)),
     statusMessage,
+    loadCaseWarning,
   };
 }
