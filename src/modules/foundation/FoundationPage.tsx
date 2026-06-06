@@ -1,5 +1,6 @@
 // ============================================================
 // صفحة تصميم الأساسات الرئيسية (Tri-Panel Layout)
+// الكود العربي السوري 2024 - ملحق 5
 // ============================================================
 
 import React, { useState, useCallback } from 'react';
@@ -7,11 +8,17 @@ import { useFoundationStore } from '@/stores/foundationStore';
 import { useAppStore } from '@/stores/appStore';
 import { t } from '@/i18n';
 import { Button } from '@/components/ui';
-import { Calculator, FileText, RotateCcw, Download, Settings2 } from 'lucide-react';
+import { Calculator, FileText, RotateCcw, Download, Settings2, Shield } from 'lucide-react';
 import FoundationForm from './inputs/FoundationForm';
 import DrawingCanvas from './components/DrawingCanvas';
 import ResultsPanel from './components/ResultsPanel';
 import { calculateFoundation } from './calculations';
+
+const LOAD_CASE_LABELS = {
+  1: { ar: 'دائمة + حية', en: 'Dead + Live', color: 'bg-green-100 text-green-800' },
+  2: { ar: 'رياح', en: 'Wind', color: 'bg-blue-100 text-blue-800' },
+  3: { ar: 'زلزال', en: 'Seismic', color: 'bg-red-100 text-red-800' },
+};
 
 export default function FoundationPage() {
   const { inputs, results, setResults, resetAll } = useFoundationStore();
@@ -34,6 +41,8 @@ export default function FoundationPage() {
     });
   }, [inputs, setResults]);
 
+  const loadCaseInfo = LOAD_CASE_LABELS[inputs.loadCase];
+
   return (
     <div className="h-full flex flex-col">
       {/* شريط الأدوات العلوي */}
@@ -51,6 +60,11 @@ export default function FoundationPage() {
             </p>
           </div>
         </div>
+
+        {/* شارة حالة التحميل */}
+        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${loadCaseInfo.color}`}>
+          {lang === 'ar' ? loadCaseInfo.ar : loadCaseInfo.en}
+        </span>
 
         <div className="flex-1" />
 
@@ -154,9 +168,20 @@ export default function FoundationPage() {
 
       {/* شريط الحالة */}
       <div className="flex items-center gap-4 px-4 py-1.5 bg-gray-900 text-gray-300 text-xs">
-        <span>{lang === 'ar' ? 'الكود: ACI 318-19' : 'Code: ACI 318-19'}</span>
+        <span className="flex items-center gap-1">
+          <Shield size={12} />
+          {lang === 'ar' ? 'الكود: العربي السوري 2024 - ملحق 5' : 'Code: Syrian Arabic 2024 - Annex 5'}
+        </span>
         <span className="text-gray-600">|</span>
         <span>{lang === 'ar' ? 'الوحدات: kN, m, mm' : 'Units: kN, m, mm'}</span>
+        <span className="text-gray-600">|</span>
+        <span>
+          {lang === 'ar' ? 'تربة: SLS' : 'Soil: SLS'}
+        </span>
+        <span className="text-gray-600">+</span>
+        <span>
+          {lang === 'ar' ? 'إنشائي: ULS' : 'Structural: ULS'}
+        </span>
         <span className="text-gray-600">|</span>
         <span>
           {results.calculated
@@ -164,6 +189,17 @@ export default function FoundationPage() {
             : (lang === 'ar' ? 'في انتظار الحساب' : 'Awaiting calculation')
           }
         </span>
+        {results.calculated && (
+          <>
+            <span className="text-gray-600">|</span>
+            <span className={results.bearingSafe ? 'text-green-400' : 'text-red-400'}>
+              {results.bearingSafe
+                ? (lang === 'ar' ? '✓ التربة آمنة' : '✓ Soil Safe')
+                : (lang === 'ar' ? '✗ تجاوز' : '✗ Exceeded')
+              }
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

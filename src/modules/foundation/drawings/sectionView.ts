@@ -1,5 +1,6 @@
 // ============================================================
 // رسم مقطع الأساس العرضي (Section View)
+// الكود العربي السوري 2024 - يدعم العمود المعدني والشد
 // ============================================================
 
 import type { FoundationInputs } from '@/stores/foundationStore';
@@ -16,7 +17,7 @@ export function drawFoundationSection(
   customOpts: Partial<DrawOptions> = {}
 ) {
   const opts = { ...DEFAULT_DRAW_OPTIONS, ...customOpts };
-  const { width: B, depth: D, thickness: h, columnWidth: c1, cover } = inputs;
+  const { width: B, length: L, depth: D, thickness: h, columnWidth: c1, columnDepth: c2, cover, isSteelColumn, basePlateWidth, basePlateDepth } = inputs;
 
   // تنظيف Canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -79,23 +80,85 @@ export function drawFoundationSection(
 
   // ─── العمود ───
   const colHeight = dPx * 0.5;
-  drawFilledRect(
-    ctx,
-    centerX - c1Px / 2,
-    baseY - hPx - colHeight,
-    c1Px,
-    colHeight,
-    '#94a3b8',
-    opts.color,
-    opts.lineWidth
-  );
+
+  if (isSteelColumn) {
+    // عمود معدني - H شكل مبسط
+    const steelWidth = c1Px * 0.6;
+    const flangeThickness = c1Px * 0.15;
+
+    drawFilledRect(
+      ctx,
+      centerX - steelWidth / 2,
+      baseY - hPx - colHeight,
+      steelWidth,
+      colHeight,
+      '#64748b',
+      '#475569',
+      opts.lineWidth
+    );
+
+    // صفيحة الارتكاز (Base Plate)
+    const bpW = (basePlateWidth || c1) * scale;
+    const bpH = Math.max(8, hPx * 0.08);
+    drawFilledRect(
+      ctx,
+      centerX - bpW / 2,
+      baseY - hPx - bpH,
+      bpW,
+      bpH,
+      '#475569',
+      '#334155',
+      opts.lineWidth + 1
+    );
+
+    // خط القطاع الحرج للعمود المعدني (منتصف المسافة)
+    const midPlate = ((basePlateDepth || c2) + c2) / 2 * scale;
+    const criticalX = centerX - bPx / 2;
+    const criticalLineX = centerX - bPx / 2 + (bPx - midPlate) / 2;
+
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(criticalLineX, baseY - hPx);
+    ctx.lineTo(criticalLineX, baseY);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    drawLabel(ctx, 'القطاع الحرج', criticalLineX, baseY - hPx - 15, opts);
+  } else {
+    // عمود خرساني عادي
+    drawFilledRect(
+      ctx,
+      centerX - c1Px / 2,
+      baseY - hPx - colHeight,
+      c1Px,
+      colHeight,
+      '#94a3b8',
+      opts.color,
+      opts.lineWidth
+    );
+
+    // خط القطاع الحرج للعمود الخرساني (عند وجه العمود)
+    const criticalX = centerX - c1Px / 2;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(criticalX, baseY - hPx);
+    ctx.lineTo(criticalX, baseY);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - hPx - 15, opts);
+  }
 
   // ─── التسليح ───
   if (opts.showRebar && results.calculated) {
     const dEffective = (h * 1000 - cover - 10) / 1000; // m
     const rebarDepth = dEffective * scale;
 
-    // أسياخ سفلية (خط أحمر)
+    // أسياخ سفلية
     const rebarY = baseY - rebarDepth;
     ctx.beginPath();
     ctx.moveTo(centerX - bPx / 2 + 10, rebarY);
@@ -122,6 +185,23 @@ export function drawFoundationSection(
     ctx.strokeStyle = '#f97316';
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  // ─── منطقة الشد (إن وجدت) ───
+  if (results.calculated && results.hasTension) {
+    const compressedFraction = results.compressedLength / L;
+    const tensionStartX = centerX - bPx / 2;
+    const tensionWidth = bPx * (1 - compressedFraction);
+
+    // تظليل منطقة الشد باللون الأحمر
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+    ctx.fillRect(tensionStartX, baseY - hPx, tensionWidth, hPx);
+
+    // علامة تحذيرية
+    ctx.font = 'bold 12px Cairo, sans-serif';
+    ctx.fillStyle = '#dc2626';
+    ctx.textAlign = 'center';
+    ctx.fillText('منطقة شد', tensionStartX + tensionWidth / 2, baseY - hPx / 2);
   }
 
   // ─── خطوط الأبعاد ───
@@ -178,7 +258,13 @@ export function drawFoundationSection(
   // ─── التسميات ───
   if (opts.showLabels) {
     drawLabel(ctx, 'خرسانة', centerX, baseY - hPx / 2, opts);
-    drawLabel(ctx, 'عمود', centerX, baseY - hPx - colHeight / 2, opts);
+
+    if (isSteelColumn) {
+      drawLabel(ctx, 'عمود معدني', centerX, baseY - hPx - colHeight / 2, opts);
+    } else {
+      drawLabel(ctx, 'عمود', centerX, baseY - hPx - colHeight / 2, opts);
+    }
+
     drawLabel(ctx, 'تربة', centerX + bPx / 2 - 30, baseY - dPx + 20, opts);
 
     if (results.calculated) {
@@ -203,4 +289,10 @@ export function drawFoundationSection(
   ctx.stroke();
   ctx.setLineDash([]);
   drawLabel(ctx, 'مستوى التأسيس', centerX + bPx / 2 + 20, groundLevel - 10, opts);
+
+  // ─── شارة الكود السوري ───
+  ctx.font = '10px Cairo, sans-serif';
+  ctx.fillStyle = '#0f766e';
+  ctx.textAlign = 'left';
+  ctx.fillText('الكود العربي السوري - ملحق 5', 10, 15);
 }

@@ -43,11 +43,11 @@ export default function SettingsPage() {
             <SelectInput
               label=""
               value={designCode}
-              onChange={(v) => setDesignCode(v as 'aci318' | 'eurocode2' | 'arabic-code')}
+              onChange={(v) => setDesignCode(v as 'syrian-code' | 'aci318' | 'eurocode2')}
               options={[
+                { value: 'syrian-code', label: t('code.syrian', lang) },
                 { value: 'aci318', label: t('code.aci318', lang) },
                 { value: 'eurocode2', label: t('code.eurocode2', lang) },
-                { value: 'arabic-code', label: t('code.arabic', lang) },
               ]}
             />
           </div>

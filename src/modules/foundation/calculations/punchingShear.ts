@@ -1,73 +1,88 @@
 // ============================================================
-// محرك حسابات الأساسات - القص الثقب
+// محرك حسابات القص والقص الثاقب
+// الكود العربي السوري 2024 - ملحق 5
+// الطريقة الحدية (ULS) لحسابات القص
 // ============================================================
 
-import type { CheckResult } from '@/types';
-import type { FoundationInputs } from '@/stores/foundationStore';
-
-export interface PunchingShearResult {
-  criticalPerimeter: number;  // u (m)
-  punchingArea: number;       // مساحة محيط القص (m²)
-  shearStress: number;        // v (MPa)
-  shearResistance: number;    // v_rd (MPa)
-  check: CheckResult;
+export interface ShearInputs {
+  P_ultimate: number;        // القوة المحورية المصعدة (kN)
+  B_footing: number;         // عرض القاعدة (m)
+  L_footing: number;         // طول القاعدة (m)
+  c_width: number;           // عرض العمود (m)
+  c_depth: number;           // عمق العمود (m)
+  d_effective: number;       // العمق الفعال للأساس (m)
+  f_ck: number;              // المقاومة المميزة للخرسانة f'c (MPa)
+  beta_eccentricity: number; // معامل تصعيد اللامركزية β
+  isSteelColumn: boolean;    // هل العمود معدني؟
+  basePlateWidth?: number;   // عرض الصفيحة المعدنية (m)
+  basePlateDepth?: number;   // عمق الصفيحة المعدنية (m)
 }
 
-/** حساب القص الثقب (Punching Shear) - ACI 318 */
-export function calculatePunchingShear(inputs: FoundationInputs, qNet: number): PunchingShearResult {
-  const { width: B, length: L, thickness: h, columnWidth: c1, columnDepth: c2, concreteGrade, cover } = inputs;
+export interface ShearResults {
+  oneWayShearSafe: boolean;
+  punchingShearSafe: boolean;
+  v_max_one_way: number;       // إجهاد القص الأحادي المؤثر (MPa)
+  v_concrete_one_way: number;  // مقاومة القص الأحادي للخرسانة (MPa)
+  v_max_punching: number;      // إجهاد القص الثاقب المؤثر (MPa)
+  v_concrete_punching: number; // مقاومة القص الثاقب للخرسانة (MPa)
+  critical_dist_one_way: number; // بعد القطاع الحرج للقص الأحادي (m)
+  u_perimeter: number;         // محيط القص الحرج (m)
+  V_ed_one_way: number;        // قوة القص الأحادي (kN)
+  V_ed_punching: number;       // قوة القص الثاقب (kN)
+}
 
-  // العمق الفعال (mm)
-  const d = (h * 1000) - cover - 10; // تقريبي
+/** حساب القص والقص الثاقب وفق الكود العربي السوري - ملحق 5 */
+export function calculateShearAndPunching(inputs: ShearInputs): ShearResults {
+  const {
+    P_ultimate, B_footing, L_footing, c_width, c_depth, d_effective, f_ck,
+    beta_eccentricity, isSteelColumn, basePlateWidth = 0, basePlateDepth = 0
+  } = inputs;
 
-  // محيط القص الحرج (mm → m)
-  const u = 2 * ((c1 * 1000) + (c2 * 1000) + 2 * d) / 1000;
+  // --- أ- القص أحادي الاتجاه (One-Way Shear) ---
+  // القطاع الحرج يقع على بعد d/2 من وجه العمود [بند 20]
+  const colDepth = isSteelColumn ? basePlateDepth : c_depth;
+  const critical_dist_one_way = colDepth / 2 + d_effective / 2;
+  const shear_area_length = Math.max(0, (L_footing / 2) - critical_dist_one_way);
 
-  // مساحة منطقة القص الثقب
-  const punchingArea = u * (d / 1000);
+  // حمولة القص المؤثرة
+  const net_soil_pressure_u = P_ultimate / (B_footing * L_footing);
+  const V_ed_one_way = net_soil_pressure_u * B_footing * shear_area_length;
+  const v_max_one_way = V_ed_one_way / (B_footing * d_effective * 1000); // MPa
 
-  // قوة القص الثقب
-  const columnArea = c1 * c2;
-  const foundationArea = B * L;
-  const punchingForce = qNet * (foundationArea - columnArea - (2 * (c1 + c2) + 4 * (d / 1000)) * (d / 1000));
+  // مقاومة الخرسانة المسموحة للقص أحادي الاتجاه (الطريقة الحدية) [بند 20]
+  const v_concrete_one_way = 0.17 * Math.sqrt(f_ck);
+  const oneWayShearSafe = v_max_one_way <= v_concrete_one_way;
 
-  // إجهاد القص
-  const beta = 1.15; // معامل للعمود الداخلي
-  const shearStress = (beta * punchingForce * 1000) / (u * 1000 * d); // MPa
+  // --- ب- القص الثاقب (Punching Shear) ---
+  // المحيط الحرج على بعد d/2 من وجه العمود/الصفيحة [بند 20, 22]
+  const col_w = isSteelColumn ? basePlateWidth : c_width;
+  const col_d = isSteelColumn ? basePlateDepth : c_depth;
 
-  // مقاومة القص الخرسانية
-  const fc = getConcreteFc(concreteGrade);
-  const vrd = 0.33 * Math.sqrt(fc); // ACI simplified
+  const critical_w = col_w + d_effective;
+  const critical_d = col_d + d_effective;
+  const u_perimeter = 2 * (critical_w + critical_d);
 
-  const ratio = shearStress / vrd;
-  const status: CheckResult['status'] = ratio <= 0.8 ? 'pass' : ratio <= 1.0 ? 'warn' : 'fail';
+  // مساحة الاختراق الحرج
+  const critical_area = critical_w * critical_d;
+  // القوة الثاقبة الصافية المصعدة مع معامل تصعيد اللامركزية β [بند 15]
+  const V_ed_punching = beta_eccentricity * (P_ultimate - (net_soil_pressure_u * critical_area));
+
+  const v_max_punching = V_ed_punching / (u_perimeter * d_effective * 1000); // MPa
+
+  // مقاومة الخرسانة للقص الثاقب الحدية [بند 22]
+  const v_concrete_punching = 0.34 * Math.sqrt(f_ck);
+  const punchingShearSafe = v_max_punching <= v_concrete_punching;
 
   return {
-    criticalPerimeter: Math.round(u * 1000) / 1000,
-    punchingArea: Math.round(punchingArea * 10000) / 10000,
-    shearStress: Math.round(shearStress * 100) / 100,
-    shearResistance: Math.round(vrd * 100) / 100,
-    check: {
-      name: 'Punching Shear',
-      nameAr: 'القص الثقب',
-      value: Math.round(shearStress * 100) / 100,
-      limit: Math.round(vrd * 100) / 100,
-      ratio: Math.round(ratio * 1000) / 1000,
-      status,
-      unit: 'MPa',
-    },
+    oneWayShearSafe,
+    punchingShearSafe,
+    v_max_one_way: Number(v_max_one_way.toFixed(3)),
+    v_concrete_one_way: Number(v_concrete_one_way.toFixed(3)),
+    v_max_punching: Number(v_max_punching.toFixed(3)),
+    v_concrete_punching: Number(v_concrete_punching.toFixed(3)),
+    critical_dist_one_way: Number(critical_dist_one_way.toFixed(3)),
+    u_perimeter: Number(u_perimeter.toFixed(3)),
+    V_ed_one_way: Number(V_ed_one_way.toFixed(2)),
+    V_ed_punching: Number(V_ed_punching.toFixed(2)),
   };
-}
-
-function getConcreteFc(grade: string): number {
-  const grades: Record<string, number> = {
-    'C20/25': 20,
-    'C25/30': 25,
-    'C30/37': 30,
-    'C35/45': 35,
-    'C40/50': 40,
-    'C45/55': 45,
-    'C50/60': 50,
-  };
-  return grades[grade] ?? 25;
 }

@@ -1,5 +1,5 @@
 // ============================================================
-// مخزن الحالة الرئيسي (Zustand)
+// مخزن الحالة الرئيسي (Zustand) - الكود السوري كافتراضي
 // ============================================================
 
 import { create } from 'zustand';
@@ -22,7 +22,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       lang: 'ar',
-      designCode: 'aci318',
+      designCode: 'syrian-code',  // الكود العربي السوري كافتراضي
       theme: 'light',
 
       setLang: (lang) => set({ lang }),
@@ -30,7 +30,7 @@ export const useAppStore = create<AppState>()(
       setTheme: (theme) => set({ theme }),
     }),
     {
-      name: 'smart-engineering-settings',
+      name: 'smart-engineering-settings-v2',
     }
   )
 );

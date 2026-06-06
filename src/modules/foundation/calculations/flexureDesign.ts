@@ -1,169 +1,119 @@
 // ============================================================
-// محرك حسابات الأساسات - الانحناء والتسليح
+// محرك تصميم الانحناء والتسليح
+// الكود العربي السوري 2024 - ملحق 5
+// الطريقة الحدية (ULS) لحسابات الانحناء والتسليح
 // ============================================================
 
-import type { CheckResult } from '@/types';
-import type { FoundationInputs } from '@/stores/foundationStore';
-import { rebarArea, REBAR_DIAMETERS } from '@/types';
-
-export interface RebarDesign {
-  diameter: number;  // mm
-  spacing: number;   // mm
-  count: number;
-  areaProvided: number; // mm²
-  areaRequired: number; // mm²
+export interface FlexureInputs {
+  P_ultimate: number;        // القوة المحورية المصعدة (kN)
+  B_footing: number;         // عرض القاعدة (m)
+  L_footing: number;         // طول القاعدة (m)
+  c_width: number;           // عرض العمود (m)
+  c_depth: number;           // عمق العمود (m)
+  d_effective: number;       // العمق الفعال (m)
+  f_yk: number;              // إجهاد خضوع الفولاذ (MPa)
+  f_ck: number;              // المقاومة المميزة للخرسانة (MPa)
+  isSteelColumn: boolean;
+  basePlateDepth?: number;
+  barDiameterChosen: number; // القطر المختار (مثل 14)
 }
 
-export interface FlexureResult {
-  momentX: number;       // kN.m
-  momentY: number;       // kN.m
-  bottomRebarX: RebarDesign;
-  bottomRebarY: RebarDesign;
-  topRebarX: RebarDesign;
-  topRebarY: RebarDesign;
-  checkX: CheckResult;
-  checkY: CheckResult;
+export interface FlexureResults {
+  M_u: number;                // العزم المصعد الأقصى (kN.m)
+  As_required: number;        // مساحة التسليح المطلوبة (mm²)
+  As_minimum: number;         // الحد الأدنى للتسليح كودياً (mm²)
+  As_provided: number;        // مساحة التسليح المتاحة (mm²)
+  bars_count: number;         // عدد الأسياخ المطلوبة
+  spacing_mm: number;         // التباعد المحسوب بين الأسياخ (mm)
+  isSpacingSafe: boolean;     // هل يحقق شرط (100mm - 200mm) [بند 21]
+  projection: number;         // طول الظفر الحرج (m)
+  detailingMessage: string;
 }
 
-/** حساب الانحناء والتسليح */
-export function calculateFlexure(inputs: FoundationInputs, qNet: number): FlexureResult {
-  const { width: B, length: L, thickness: h, concreteGrade, steelGrade, cover, columnWidth: c1, columnDepth: c2 } = inputs;
+/** تصميم الانحناء والتسليح وفق الكود العربي السوري - ملحق 5 */
+export function designFlexure(inputs: FlexureInputs): FlexureResults {
+  const {
+    P_ultimate, B_footing, L_footing, c_width, c_depth, d_effective,
+    f_yk, f_ck, isSteelColumn, basePlateDepth = 0, barDiameterChosen
+  } = inputs;
 
-  const d = (h * 1000) - cover - 10; // العمق الفعال (mm)
-  const fc = getConcreteFc(concreteGrade);
-  const fy = getSteelFy(steelGrade);
-
-  // عزم الانحناء في كل اتجاه (تبسيط: cantilever من واجهة العمود)
-  const cantileverX = (L - c1) / 2; // (m)
-  const cantileverY = (B - c2) / 2; // (m)
-
-  const momentX = qNet * B * cantileverX * cantileverX / 2; // kN.m
-  const momentY = qNet * L * cantileverY * cantileverY / 2; // kN.m
-
-  // حساب التسليح لكل اتجاه
-  const bottomRebarX = designRebar(momentX, B * 1000, d, fc, fy);
-  const bottomRebarY = designRebar(momentY, L * 1000, d, fc, fy);
-
-  // تسليح علوي (أدنى - shrinkage)
-  const topRebarX = designMinRebar(B * 1000, d, fy);
-  const topRebarY = designMinRebar(L * 1000, d, fy);
-
-  return {
-    momentX: Math.round(momentX * 100) / 100,
-    momentY: Math.round(momentY * 100) / 100,
-    bottomRebarX,
-    bottomRebarY,
-    topRebarX,
-    topRebarY,
-    checkX: {
-      name: 'Flexure X',
-      nameAr: 'انحناء اتجاه X',
-      value: Math.round(momentX * 100) / 100,
-      limit: 0, // ليس حد كودي مباشر
-      ratio: bottomRebarX.areaProvided > 0 ? bottomRebarX.areaRequired / bottomRebarX.areaProvided : 0,
-      status: bottomRebarX.areaProvided >= bottomRebarX.areaRequired ? 'pass' : 'fail',
-      unit: 'kN.m',
-    },
-    checkY: {
-      name: 'Flexure Y',
-      nameAr: 'انحناء اتجاه Y',
-      value: Math.round(momentY * 100) / 100,
-      limit: 0,
-      ratio: bottomRebarY.areaProvided > 0 ? bottomRebarY.areaRequired / bottomRebarY.areaProvided : 0,
-      status: bottomRebarY.areaProvided >= bottomRebarY.areaRequired ? 'pass' : 'fail',
-      unit: 'kN.m',
-    },
-  };
-}
-
-/** تصميم التسليح لاتجاه واحد */
-function designRebar(M: number, b: number, d: number, fc: number, fy: number): RebarDesign {
-  if (M <= 0) {
-    return { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 };
+  // 1. تحديد موقع القطاع الحرج وحساب ذراع الظفر [بند 20]
+  let projection = 0; // طول الظفر الحرج (m)
+  if (isSteelColumn) {
+    // عمود معدني: عند منتصف المسافة بين وجه العمود وحافة الصفيحة القاعدة
+    const mid_plate = (basePlateDepth + c_depth) / 2;
+    projection = (L_footing / 2) - (mid_plate / 2);
+  } else {
+    // عمود خرساني: عند وجه العمود تماماً
+    projection = (L_footing - c_depth) / 2;
   }
 
-  // M بـ kN.m → N.mm
-  const Mnm = M * 1e6;
+  // 2. حساب العزم الأقصى الحدي (M_u) عند القطاع الحرج
+  const net_soil_pressure_u = P_ultimate / (B_footing * L_footing);
+  const M_u = (net_soil_pressure_u * B_footing * Math.pow(projection, 2)) / 2; // kN.m
 
-  // حساب a (عمق المكعب الخرساني المكافئ)
-  const a = d - Math.sqrt(d * d - (2 * Mnm) / (0.85 * fc * b));
+  // 3. حساب التسليح بالطريقة الحدية (ULS) مع معامل خفض المقاومة (phi = 0.9)
+  const phi = 0.9;
+  const b_width_mm = B_footing * 1000;
+  const d_mm = d_effective * 1000;
 
-  // مساحة التسليح المطلوبة
-  const As = (0.85 * fc * b * a) / fy;
+  // حساب مساحة الحديد بالطريقة التقريبية الدقيقة لـ ULS
+  const Rn = (M_u * Math.pow(10, 6)) / (phi * b_width_mm * Math.pow(d_mm, 2));
+  const m = f_yk / (0.85 * f_ck);
+  const discriminant = 1 - (2 * m * Rn) / f_yk;
 
-  // مساحة التسليح الدنيا
-  const AsMin = Math.max(0.0013 * b * d, (0.25 * Math.sqrt(fc) / fy) * b * d);
-  const AsRequired = Math.max(As, AsMin);
-
-  // اختيار قطر السيخ والمسافة
-  return selectRebar(AsRequired, b);
-}
-
-/** اختيار أسياخ مناسبة من الجدول */
-function selectRebar(AsRequired: number, b: number): RebarDesign {
-  let bestDiameter = 12;
-  let bestSpacing = 200;
-  let bestCount = 0;
-  let bestArea = 0;
-
-  for (const dia of REBAR_DIAMETERS) {
-    if (dia < 10 || dia > 25) continue; // نطاق معقول للأساسات
-
-    const singleArea = rebarArea(dia);
-    const count = Math.ceil(AsRequired / singleArea);
-    const spacing = Math.floor((b - 2 * 50) / (count - 1)); // 50mm غطاء جانبي
-    const areaProvided = singleArea * count;
-
-    // نفضّل أقطار أكبر مع مسافات معقولة (150-250mm)
-    if (spacing >= 150 && spacing <= 300 && areaProvided >= AsRequired) {
-      if (bestArea === 0 || (spacing >= 150 && spacing <= 250)) {
-        bestDiameter = dia;
-        bestSpacing = spacing;
-        bestCount = count;
-        bestArea = areaProvided;
-        break; // أول خيار مناسب
-      }
-    }
+  let As_required = 0;
+  if (discriminant >= 0) {
+    const rho = (1 / m) * (1 - Math.sqrt(discriminant));
+    As_required = rho * b_width_mm * d_mm; // mm²
+  } else {
+    // المقاطع فوق المتوازن - يلزم زيادة سماكة الأساس
+    As_required = 0.05 * b_width_mm * d_mm; // تسليح عالي كإنذار
   }
 
-  // إذا لم نجد خياراً مناسباً، نستخدم الأقرب
-  if (bestArea === 0) {
-    const dia = 16;
-    const singleArea = rebarArea(dia);
-    const count = Math.ceil(AsRequired / singleArea);
-    bestDiameter = dia;
-    bestCount = count;
-    bestSpacing = Math.max(100, Math.floor((b - 100) / count));
-    bestArea = singleArea * count;
+  // 4. تطبيق شروط الحدود الدنيا للتسليح (Rho_min) [بند 9, 25]
+  const rho_min = f_yk >= 400 ? 0.0018 : 0.0020;
+  const As_minimum = rho_min * b_width_mm * d_mm;
+
+  if (As_required < As_minimum) {
+    As_required = As_minimum;
+  }
+
+  // 5. حساب عدد الأسياخ والتباعد بناءً على القطر المختار (يجب ألا يقل عن 12mm) [بند 21]
+  const single_bar_area = (Math.PI * Math.pow(barDiameterChosen, 2)) / 4;
+  let bars_count = Math.ceil(As_required / single_bar_area);
+  const As_provided = single_bar_area * bars_count;
+
+  // حساب التباعد بين الأسياخ (Spacing)
+  let spacing_mm = Math.floor((B_footing * 1000 - 2 * 50) / (bars_count - 1)); // 50mm غطاء جانبي
+
+  // 6. التحقق من اشتراطات التباعد الصارمة للكود السوري (100mm <= spacing <= 200mm) [بند 21]
+  let isSpacingSafe = true;
+  let detailingMessage = 'توزيع التسليح متوافق مع اشتراطات الملحق 5';
+
+  if (spacing_mm > 200) {
+    spacing_mm = 200;
+    bars_count = Math.ceil((B_footing * 1000 - 2 * 50) / spacing_mm) + 1;
+    detailingMessage = 'تم تقييد التباعد للحد الأقصى الكودي (200mm) وزيادة عدد الأسياخ لمنع التشقق';
+  } else if (spacing_mm < 100) {
+    isSpacingSafe = false;
+    detailingMessage = 'التباعد أقل من الحد الأدنى الكودي (100mm)، يرجى زيادة سماكة الأساس أو قطر السيخ!';
+  }
+
+  if (barDiameterChosen < 12) {
+    isSpacingSafe = false;
+    detailingMessage += ' | القطر المختار أقل من 12 مم المسموح بها للأساسات الرئيسية!';
   }
 
   return {
-    diameter: bestDiameter,
-    spacing: bestSpacing,
-    count: bestCount,
-    areaProvided: Math.round(bestArea * 100) / 100,
-    areaRequired: Math.round(AsRequired * 100) / 100,
+    M_u: Number(M_u.toFixed(2)),
+    As_required: Number(As_required.toFixed(1)),
+    As_minimum: Number(As_minimum.toFixed(1)),
+    As_provided: Number(As_provided.toFixed(1)),
+    bars_count,
+    spacing_mm,
+    isSpacingSafe,
+    projection: Number(projection.toFixed(3)),
+    detailingMessage,
   };
-}
-
-/** تسليح أدنى (انكماش) */
-function designMinRebar(b: number, d: number, fy: number): RebarDesign {
-  const AsMin = 0.0018 * b * d; // ACI shrinkage minimum
-  const result = selectRebar(AsMin, b);
-  return result;
-}
-
-function getConcreteFc(grade: string): number {
-  const grades: Record<string, number> = {
-    'C20/25': 20, 'C25/30': 25, 'C30/37': 30,
-    'C35/45': 35, 'C40/50': 40, 'C45/55': 45, 'C50/60': 50,
-  };
-  return grades[grade] ?? 25;
-}
-
-function getSteelFy(grade: string): number {
-  const grades: Record<string, number> = {
-    'B240': 240, 'B300': 300, 'B400': 400, 'B500': 500, 'B520': 520,
-  };
-  return grades[grade] ?? 400;
 }

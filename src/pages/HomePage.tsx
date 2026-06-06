@@ -1,11 +1,11 @@
 // ============================================================
-// الصفحة الرئيسية
+// الصفحة الرئيسية - الكود العربي السوري 2024
 // ============================================================
 
 import React from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { t } from '@/i18n';
-import { Triangle, Square, Columns3, Building2, ArrowLeft } from 'lucide-react';
+import { Triangle, Square, Columns3, Building2, ArrowLeft, Shield } from 'lucide-react';
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
@@ -18,9 +18,10 @@ const MODULES = [
     color: 'from-teal-500 to-teal-700',
     labelAr: 'الأساسات',
     labelEn: 'Foundations',
-    descAr: 'تصميم الأساسات المنفردة والمتصلة واللبية وحصيرة الأساسات',
-    descEn: 'Design of isolated, combined, strap and mat foundations',
+    descAr: 'تصميم الأساسات المنفردة والمتصلة واللبية وحصيرة الأساسات وفق الكود العربي السوري - ملحق 5',
+    descEn: 'Design of isolated, combined, strap and mat foundations per Syrian Arabic Code - Annex 5',
     active: true,
+    badge: 'ملحق 5',
   },
   {
     id: 'beams',
@@ -28,8 +29,8 @@ const MODULES = [
     color: 'from-blue-500 to-blue-700',
     labelAr: 'الجوائز',
     labelEn: 'Beams',
-    descAr: 'تصميم الجوائز البسيطة والمستمرة والكانتيليفر',
-    descEn: 'Design of simply-supported, continuous and cantilever beams',
+    descAr: 'تصميم الجوائز البسيطة والمستمرة والكانتيليفر وفق الكود العربي السوري',
+    descEn: 'Design of simply-supported, continuous and cantilever beams per Syrian Arabic Code',
     active: false,
   },
   {
@@ -38,8 +39,8 @@ const MODULES = [
     color: 'from-purple-500 to-purple-700',
     labelAr: 'البلاطات',
     labelEn: 'Slabs',
-    descAr: 'تصميم البلاطات باتجاه واحد واتجاهين والبلاطات الفطيرة',
-    descEn: 'Design of one-way, two-way and flat slabs',
+    descAr: 'تصميم البلاطات باتجاه واحد واتجاهين والبلاطات الفطيرة وفق الكود العربي السوري',
+    descEn: 'Design of one-way, two-way and flat slabs per Syrian Arabic Code',
     active: false,
   },
   {
@@ -48,8 +49,8 @@ const MODULES = [
     color: 'from-orange-500 to-orange-700',
     labelAr: 'الأعمدة',
     labelEn: 'Columns',
-    descAr: 'تصميم الأعمدة المربعة والدائرية المعرضة لضغط وانحناء',
-    descEn: 'Design of square and circular columns under axial load and bending',
+    descAr: 'تصميم الأعمدة المربعة والدائرية المعرضة لضغط وانحناء وفق الكود العربي السوري',
+    descEn: 'Design of square and circular columns under axial load and bending per Syrian Arabic Code',
     active: false,
   },
 ];
@@ -62,13 +63,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* البانر الرئيسي */}
       <div className="bg-gradient-to-br from-teal-700 via-teal-800 to-teal-900 text-white px-8 py-10 lg:py-16">
         <div className="max-w-3xl">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield size={20} className="text-teal-300" />
+            <span className="text-sm text-teal-200 font-medium">
+              {lang === 'ar' ? 'الكود العربي السوري 2024' : 'Syrian Arabic Code 2024'}
+            </span>
+          </div>
           <h1 className="text-2xl lg:text-4xl font-bold mb-3">
             {t('app.title', lang)}
           </h1>
           <p className="text-teal-100 text-sm lg:text-base leading-relaxed">
             {lang === 'ar'
-              ? 'منصة هندسية متكاملة للتصميم الإنشائي، تجمع بين الحسابات الهندسية الدقيقة والرسوم التفاعلية والتقارير المهنية في تطبيق واحد ذكي.'
-              : 'An integrated engineering platform for structural design, combining precise calculations, interactive drawings, and professional reports in one smart app.'
+              ? 'منصة هندسية متكاملة للتصميم الإنشائي وفق الكود العربي السوري، تجمع بين الحسابات الحدية والتشغيلية والرسوم التفاعلية والتقارير المهنية في تطبيق واحد ذكي. الطريقة الحدية (ULS) للبيتون والتسليح، والطريقة التشغيلية (SLS) لتحققات التربة والاستقرار.'
+              : 'An integrated engineering platform for structural design per the Syrian Arabic Code, combining limit state and serviceability calculations, interactive drawings, and professional reports in one smart app. ULS for concrete and reinforcement, SLS for soil and stability checks.'
             }
           </p>
 
@@ -81,16 +88,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </div>
             <div className="w-px h-10 bg-teal-600" />
             <div className="text-center">
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">ULS+SLS</div>
               <div className="text-xs text-teal-200">
-                {lang === 'ar' ? 'أكواد تصميم' : 'Design Codes'}
+                {lang === 'ar' ? 'طرق تصميم' : 'Design Methods'}
               </div>
             </div>
             <div className="w-px h-10 bg-teal-600" />
             <div className="text-center">
-              <div className="text-2xl font-bold">∞</div>
+              <div className="text-2xl font-bold">3</div>
               <div className="text-xs text-teal-200">
-                {lang === 'ar' ? 'مشروعات' : 'Projects'}
+                {lang === 'ar' ? 'حالات تحميل' : 'Load Cases'}
               </div>
             </div>
           </div>
@@ -135,6 +142,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               {!mod.active && (
                 <span className="absolute top-4 left-4 text-xs bg-gray-100 text-gray-400 px-2 py-1 rounded-full">
                   {lang === 'ar' ? 'قريباً' : 'Coming Soon'}
+                </span>
+              )}
+
+              {mod.active && mod.badge && (
+                <span className="absolute top-4 left-4 text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-semibold">
+                  {mod.badge}
                 </span>
               )}
             </button>
