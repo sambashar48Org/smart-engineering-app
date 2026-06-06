@@ -1,5 +1,8 @@
 // ============================================================
 // لوحة نتائج الأساسات - الكود العربي السوري 2024
+// المنطق الذكي:
+//   منفرد/مستمر = بدون تسليح علوي "غير مطلوب إنشائياً كودياً"
+//   حصيرة/مشترك = شبكتان كاملتان + تحقق جساءة
 // الرموز الكودية: σ₁, σ₂, q_magnified, Base-PSR, F_s
 // ============================================================
 
@@ -11,7 +14,7 @@ import { Card, StatusBadge } from '@/components/ui';
 import type { Lang } from '@/types';
 
 export default function ResultsPanel() {
-  const { results } = useFoundationStore();
+  const { inputs, results } = useFoundationStore();
   const { lang } = useAppStore();
 
   if (!results.calculated) {
@@ -26,6 +29,9 @@ export default function ResultsPanel() {
       </div>
     );
   }
+
+  const isIsolatedOrStrip = inputs.type === 'isolated' || inputs.type === 'continuous';
+  const isRaft = inputs.type === 'mat';
 
   return (
     <div className="space-y-4 overflow-y-auto h-full p-1">
@@ -142,48 +148,93 @@ export default function ResultsPanel() {
         </div>
       </Card>
 
-      {/* جدول التحققات الموحد */}
-      <Card title={lang === 'ar' ? 'جدول التحققات الكودية' : 'Code Checks Table'}>
-        <div className="space-y-2">
-          {results.checks.map((check, i) => (
-            <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-              <div className="space-y-0.5">
-                <span className="text-sm font-medium text-gray-800">
-                  {check.nameAr}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {check.value} / {check.limit} {check.unit}
-                </span>
-              </div>
-              <StatusBadge status={check.status} lang={lang} />
+      {/* تحقق جساءة الحصيرة [بند 11] */}
+      {isRaft && results.raftStiffnessCheck && (
+        <Card title={lang === 'ar' ? 'تحقق جساءة الحصيرة [بند 11]' : 'Raft Stiffness Check [Clause 11]'}>
+          <div className={`p-3 rounded-lg text-xs ${
+            results.raftStiffnessCheck.isRigid
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold">
+                {results.raftStiffnessCheck.isRigid
+                  ? (lang === 'ar' ? '✅ الحصيرة صلدة' : '✅ Raft is Rigid')
+                  : (lang === 'ar' ? '❌ الحصيرة غير صلدة' : '❌ Raft is NOT Rigid')
+                }
+              </span>
+              <StatusBadge status={results.raftStiffnessCheck.isRigid ? 'pass' : 'fail'} lang={lang} />
             </div>
-          ))}
-        </div>
-      </Card>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span>{lang === 'ar' ? 'السمك الفعلي t' : 'Actual Thickness t'}</span>
+                <span className="font-mono">{results.raftStiffnessCheck.actualThickness} m</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{lang === 'ar' ? 'الحد الأدنى المطلوب' : 'Required Minimum'}</span>
+                <span className="font-mono">{results.raftStiffnessCheck.minThickness} m</span>
+              </div>
+            </div>
+            <p className="mt-2">{results.raftStiffnessCheck.message}</p>
+          </div>
+        </Card>
+      )}
 
       {/* التسليح */}
       <Card title={lang === 'ar' ? 'التسليح المقترح' : 'Proposed Reinforcement'}>
         <div className="space-y-3">
+          {/* تسليح سفلي - دائماً موجود */}
           <RebarRowV2
-            label={lang === 'ar' ? 'أسفل (X)' : 'Bottom (X)'}
+            label={lang === 'ar' ? 'أسفل (X) - فرش' : 'Bottom (X) - Main'}
             rebar={results.bottomRebarX}
             lang={lang}
           />
           <RebarRowV2
-            label={lang === 'ar' ? 'أسفل (Y)' : 'Bottom (Y)'}
+            label={lang === 'ar' ? 'أسفل (Y) - غطاء' : 'Bottom (Y) - Distribution'}
             rebar={results.bottomRebarY}
             lang={lang}
           />
-          <RebarRowV2
-            label={lang === 'ar' ? 'أعلى (X) - انكماش' : 'Top (X) - Shrinkage'}
-            rebar={results.topRebarX}
-            lang={lang}
-          />
-          <RebarRowV2
-            label={lang === 'ar' ? 'أعلى (Y) - انكماش' : 'Top (Y) - Shrinkage'}
-            rebar={results.topRebarY}
-            lang={lang}
-          />
+
+          {/* تسليح علوي - المنطق الذكي */}
+          {isIsolatedOrStrip ? (
+            // منفرد/مستمر: إلغاء كامل للتسليح العلوي
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-300">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold text-amber-800">
+                  {lang === 'ar' ? 'التسليح العلوي' : 'Top Reinforcement'}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-amber-700">
+                {lang === 'ar'
+                  ? 'غير مطلوب إنشائياً كودياً (توفير هدر)'
+                  : 'Not required structurally per code (material savings)'}
+              </p>
+              <p className="text-xs text-amber-600 mt-1">
+                {lang === 'ar'
+                  ? 'الأساس المنفرد/المستمر يعمل ككنسة بظفر صاعد، لا توجد عزوم سلبية تتطلب تسليحاً علويّاً'
+                  : 'Isolated/continuous footing acts as a cantilever with upward projection, no negative moments requiring top rebar'}
+              </p>
+            </div>
+          ) : (
+            // حصيرة/مشترك: شبكتان كاملتان
+            <>
+              <RebarRowV2
+                label={lang === 'ar' ? 'أعلى (X) - شبكة علوية' : 'Top (X) - Upper Mesh'}
+                rebar={results.topRebarX}
+                lang={lang}
+              />
+              <RebarRowV2
+                label={lang === 'ar' ? 'أعلى (Y) - شبكة علوية' : 'Top (Y) - Upper Mesh'}
+                rebar={results.topRebarY}
+                lang={lang}
+              />
+              {results.topRebarMessage && (
+                <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-700">{results.topRebarMessage}</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* العزم */}
@@ -210,6 +261,25 @@ export default function ResultsPanel() {
             {results.flexureMessage}
           </div>
         )}
+      </Card>
+
+      {/* جدول التحققات */}
+      <Card title={lang === 'ar' ? 'جدول التحققات الكودية' : 'Code Checks Table'}>
+        <div className="space-y-2">
+          {results.checks.map((check, i) => (
+            <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+              <div className="space-y-0.5">
+                <span className="text-sm font-medium text-gray-800">
+                  {check.nameAr}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {check.value} / {check.limit} {check.unit}
+                </span>
+              </div>
+              <StatusBadge status={check.status} lang={lang} />
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* رسالة إجهاد التربة */}
@@ -260,7 +330,7 @@ function ShearRow({ label, vMax, vRd, safe, lang }: {
   );
 }
 
-/** صف تسليح محدّث */
+/** صف تسليح */
 function RebarRowV2({
   label,
   rebar,

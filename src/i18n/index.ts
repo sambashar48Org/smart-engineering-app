@@ -22,8 +22,8 @@ const translations: Record<string, Record<Lang, string>> = {
   // الأساسات
   'foundation.title': { ar: 'تصميم الأساسات', en: 'Foundation Design' },
   'foundation.isolated': { ar: 'أساس منفرد', en: 'Isolated Foundation' },
+  'foundation.continuous': { ar: 'أساس مستمر', en: 'Continuous/Strip Foundation' },
   'foundation.combined': { ar: 'أساس مشترك', en: 'Combined Foundation' },
-  'foundation.strap': { ar: 'أساس لَبّي', en: 'Strap Foundation' },
   'foundation.mat': { ar: 'حصيرة عامة', en: 'Mat Foundation' },
   'foundation.codeRef': { ar: 'الكود العربي السوري 2024 - ملحق 5', en: 'Syrian Arabic Code 2024 - Annex 5' },
 

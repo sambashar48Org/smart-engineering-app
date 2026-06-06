@@ -1,13 +1,16 @@
 // ============================================================
 // رسم مقطع الأساس العرضي (Section View)
 // الكود العربي السوري 2024 - يدعم العمود المعدني والشد
+// المنطق الذكي:
+//   منفرد/مستمر = تسليح سفلي فقط (بدون شبكة علوية)
+//   حصيرة/مشترك = شبكتان كاملتان (علوية + سفلية)
 // الرموز الكودية: t, D_f, σ₁
 // ============================================================
 
 import type { FoundationInputs } from '@/stores/foundationStore';
 import type { FoundationResults } from '@/stores/foundationStore';
 import type { DrawOptions } from '@/engine/drawing/canvasEngine';
-import { DEFAULT_DRAW_OPTIONS, drawFilledRect, drawDimensionLine, drawHatching, drawRebarDot, drawLabel, drawLine } from '@/engine/drawing/canvasEngine';
+import { DEFAULT_DRAW_OPTIONS, drawFilledRect, drawDimensionLine, drawHatching, drawRebarDot, drawLabel } from '@/engine/drawing/canvasEngine';
 
 /** رسم المقطع العرضي الكامل */
 export function drawFoundationSection(
@@ -19,6 +22,7 @@ export function drawFoundationSection(
 ) {
   const opts = { ...DEFAULT_DRAW_OPTIONS, ...customOpts };
   const { B, L, D_f, t, columnWidth: c1, columnDepth: c2, cover, isSteelColumn, basePlateWidth, basePlateDepth } = inputs;
+  const isRaftOrCombined = inputs.type === 'mat' || inputs.type === 'combined';
 
   // تنظيف Canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -67,7 +71,6 @@ export function drawFoundationSection(
     opts.lineWidth
   );
 
-  // تظليل خفيف داخل الخرسانة
   drawHatching(
     ctx,
     centerX - bPx / 2,
@@ -83,9 +86,7 @@ export function drawFoundationSection(
   const colHeight = dPx * 0.5;
 
   if (isSteelColumn) {
-    // عمود معدني - H شكل مبسط
     const steelWidth = c1Px * 0.6;
-    const flangeThickness = c1Px * 0.15;
 
     drawFilledRect(
       ctx,
@@ -112,7 +113,7 @@ export function drawFoundationSection(
       opts.lineWidth + 1
     );
 
-    // خط القطاع الحرج للعمود المعدني (منتصف المسافة)
+    // خط القطاع الحرج للعمود المعدني
     const midPlate = ((basePlateDepth || c2) + c2) / 2 * scale;
     const criticalLineX = centerX - bPx / 2 + (bPx - midPlate) / 2;
 
@@ -153,12 +154,14 @@ export function drawFoundationSection(
     drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - tPx - 15, opts);
   }
 
-  // ─── التسليح ───
+  // ══════════════════════════════════════
+  // التسليح - المنطق الذكي
+  // ══════════════════════════════════════
   if (opts.showRebar && results.calculated) {
     const dEffective = (t * 1000 - cover - 10) / 1000;
     const rebarDepth = dEffective * scale;
 
-    // أسياخ سفلية
+    // ── أسياخ سفلية (دائماً موجودة) ──
     const rebarY = baseY - rebarDepth;
     ctx.beginPath();
     ctx.moveTo(centerX - bPx / 2 + 10, rebarY);
@@ -167,7 +170,7 @@ export function drawFoundationSection(
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // نقاط الأسياخ
+    // نقاط الأسياخ السفلية
     if (results.bottomRebarX.diameter > 0) {
       const spacing = results.bottomRebarX.spacing * scale / 1000;
       const startX = centerX - bPx / 2 + 20;
@@ -177,14 +180,33 @@ export function drawFoundationSection(
       }
     }
 
-    // أسياخ علوية
-    const topRebarY = baseY - tPx + 15;
-    ctx.beginPath();
-    ctx.moveTo(centerX - bPx / 2 + 10, topRebarY);
-    ctx.lineTo(centerX + bPx / 2 - 10, topRebarY);
-    ctx.strokeStyle = '#f97316';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // تسمية التسليح السفلي
+    drawLabel(ctx, 'فرش سفلي', centerX + bPx / 2 + 5, rebarY - 10, opts);
+
+    // ── أسياخ علوية (فقط للحصيرة/المشترك) ──
+    if (isRaftOrCombined && results.topRebarRequired) {
+      const topRebarY = baseY - tPx + 15;
+      ctx.beginPath();
+      ctx.moveTo(centerX - bPx / 2 + 10, topRebarY);
+      ctx.lineTo(centerX + bPx / 2 - 10, topRebarY);
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // نقاط الأسياخ العلوية
+      if (results.topRebarX.diameter > 0) {
+        const topSpacing = results.topRebarX.spacing * scale / 1000;
+        const startX = centerX - bPx / 2 + 20;
+        const endX = centerX + bPx / 2 - 20;
+        for (let x = startX; x <= endX; x += Math.max(topSpacing, 15)) {
+          drawRebarDot(ctx, x, topRebarY, 6, '#f97316');
+        }
+      }
+
+      // تسمية التسليح العلوي
+      drawLabel(ctx, 'غطاء علوي', centerX + bPx / 2 + 5, topRebarY - 10, opts);
+    }
+    // منفرد/مستمر: لا نرسم أي شيء علوي - التسليح السفلي فقط (الفرش والغطاء)
   }
 
   // ─── منطقة الشد (إن وجدت) ───
@@ -193,11 +215,9 @@ export function drawFoundationSection(
     const tensionStartX = centerX - bPx / 2;
     const tensionWidth = bPx * (1 - compressedFraction);
 
-    // تظليل منطقة الشد باللون الأحمر
     ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
     ctx.fillRect(tensionStartX, baseY - tPx, tensionWidth, tPx);
 
-    // علامة تحذيرية
     ctx.font = 'bold 12px Cairo, sans-serif';
     ctx.fillStyle = '#dc2626';
     ctx.textAlign = 'center';
@@ -206,7 +226,6 @@ export function drawFoundationSection(
 
   // ─── خطوط الأبعاد ───
   if (opts.showDimensions) {
-    // عرض الأساس
     drawDimensionLine(
       ctx,
       centerX - bPx / 2,
@@ -218,7 +237,6 @@ export function drawFoundationSection(
       opts
     );
 
-    // سمك بلاطة الأساس (t)
     drawDimensionLine(
       ctx,
       centerX + bPx / 2 + 15,
@@ -230,7 +248,6 @@ export function drawFoundationSection(
       opts
     );
 
-    // منسوب التأسيس (D_f)
     drawDimensionLine(
       ctx,
       centerX - bPx / 2 - 15,
@@ -242,7 +259,6 @@ export function drawFoundationSection(
       opts
     );
 
-    // عرض العمود
     drawDimensionLine(
       ctx,
       centerX - c1Px / 2,

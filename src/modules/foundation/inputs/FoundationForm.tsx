@@ -12,8 +12,8 @@ import type { FoundationType, LoadCase } from '@/types';
 
 const FOUNDATION_TYPES: { value: FoundationType; labelAr: string; labelEn: string }[] = [
   { value: 'isolated', labelAr: 'أساس منفرد', labelEn: 'Isolated' },
+  { value: 'continuous', labelAr: 'أساس مستمر', labelEn: 'Continuous/Strip' },
   { value: 'combined', labelAr: 'أساس مشترك', labelEn: 'Combined' },
-  { value: 'strap', labelAr: 'أساس لَبّي', labelEn: 'Strap' },
   { value: 'mat', labelAr: 'حصيرة عامة', labelEn: 'Mat/Raft' },
 ];
 
@@ -343,6 +343,28 @@ export default function FoundationForm() {
           step={0.05}
         />
       </div>
+
+      {/* حقل خاص بالحصيرة: أكبر مسافة بين أعمدة */}
+      {inputs.type === 'mat' && (
+        <div className="space-y-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+          <h4 className="text-xs font-semibold text-purple-700 uppercase tracking-wider">
+            {lang === 'ar' ? 'بيانات الحصيرة العامة' : 'Raft-Specific Data'}
+          </h4>
+          <NumberInput
+            label={lang === 'ar' ? 'أكبر مسافة بين عمودين متجاورين (m)' : 'Max Column Spacing (m)'}
+            value={inputs.maxColumnSpacing}
+            onChange={(v) => setInputs({ maxColumnSpacing: v })}
+            unit="m"
+            min={1.0}
+            step={0.5}
+          />
+          <p className="text-xs text-purple-600">
+            {lang === 'ar'
+              ? 'يُستخدم لتحقق جساءة الحصيرة: t ≥ (أكبر مسافة / 8) [بند 11]'
+              : 'Used for raft stiffness check: t ≥ (max spacing / 8) [Clause 11]'}
+          </p>
+        </div>
+      )}
 
       {/* أزرار */}
       <div className="pt-3 border-t border-gray-100">

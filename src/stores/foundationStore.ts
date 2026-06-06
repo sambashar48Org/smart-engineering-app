@@ -1,6 +1,7 @@
 // ============================================================
 // مخزن بيانات الأساسات - الكود العربي السوري 2024
 // الرموز الكودية: V, t, D_f, σ₁, σ₂, q_magnified, c_w, δ, f'_c, f_y
+// المنطق الذكي: منفرد/مستمر = بدون تسليح علوي، حصيرة = شبكتان كاملتان
 // ============================================================
 
 import { create } from 'zustand';
@@ -51,6 +52,9 @@ export interface FoundationInputs {
 
   // معامل β
   betaEccentricity: number; // معامل تصعيد اللامركزية
+
+  // حصيرة عامة فقط
+  maxColumnSpacing: number; // أكبر مسافة بين عمودين متجاورين (m) - لشرط الجساءة
 }
 
 /** نتائج حسابات الأساس - الرموز الكودية السورية */
@@ -89,6 +93,18 @@ export interface FoundationResults {
   topRebarX: { diameter: number; spacing: number; count: number; areaProvided: number; areaRequired: number };
   topRebarY: { diameter: number; spacing: number; count: number; areaProvided: number; areaRequired: number };
 
+  // هل التسليح العلوي مطلوب؟ (منفرد/مستمر = لا، حصيرة/مشترك = نعم)
+  topRebarRequired: boolean;
+  topRebarMessage: string;
+
+  // تحقق جساءة الحصيرة [بند 11]
+  raftStiffnessCheck?: {
+    isRigid: boolean;
+    minThickness: number;    // الحد الأدنى للسمك (m)
+    actualThickness: number; // السمك الفعلي (m)
+    message: string;
+  };
+
   // التحققات الموحدة
   checks: CheckResult[];
 
@@ -108,6 +124,8 @@ interface FoundationState {
   resetInputs: () => void;
   resetAll: () => void;
 }
+
+const NO_REBAR = { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 };
 
 const defaultInputs: FoundationInputs = {
   type: 'isolated',
@@ -137,6 +155,7 @@ const defaultInputs: FoundationInputs = {
   basePlateDepth: 0.3,
   barDiameterChosen: 14,
   betaEccentricity: 1.15,
+  maxColumnSpacing: 5.0,
 };
 
 const defaultResults: FoundationResults = {
@@ -162,10 +181,12 @@ const defaultResults: FoundationResults = {
   v_max_punching: 0,
   v_concrete_punching: 0,
   M_u: 0,
-  bottomRebarX: { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 },
-  bottomRebarY: { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 },
-  topRebarX: { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 },
-  topRebarY: { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 },
+  bottomRebarX: { ...NO_REBAR },
+  bottomRebarY: { ...NO_REBAR },
+  topRebarX: { ...NO_REBAR },
+  topRebarY: { ...NO_REBAR },
+  topRebarRequired: false,
+  topRebarMessage: '',
   checks: [],
   bearingMessage: '',
   flexureMessage: '',
@@ -189,7 +210,7 @@ export const useFoundationStore = create<FoundationState>()(
       resetAll: () => set({ inputs: { ...defaultInputs }, results: { ...defaultResults } }),
     }),
     {
-      name: 'smart-engineering-foundation-v3',
+      name: 'smart-engineering-foundation-v4',
     }
   )
 );

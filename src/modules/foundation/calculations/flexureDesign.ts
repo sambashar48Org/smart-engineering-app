@@ -1,9 +1,13 @@
 // ============================================================
-// محرك تصميم الانحناء والتسليح
+// محرك تصميم الانحناء والتسليح - المنطق الذكي
 // الكود العربي السوري 2024 - ملحق 5
 // الطريقة الحدية (ULS) لحسابات الانحناء والتسليح
 // الرموز الكودية: f'_c, f_y, d, φ=0.9
+// منفرد/مستمر: تسليح سفلي فقط (ظفر القاعدة الصاعد)
+// حصيرة: شبكتان كاملتان (علوية + سفلية)، تباعد أقصى 250mm [بند 9]
 // ============================================================
+
+import type { FoundationType } from '@/types';
 
 export interface FlexureInputs {
   P_ultimate: number;        // القوة المحورية المصعدة (kN)
@@ -16,7 +20,8 @@ export interface FlexureInputs {
   f_c_prime: number;         // المقاومة الأسطوانية الإنشائية f'_c (MPa)
   isSteelColumn: boolean;
   basePlateDepth?: number;
-  barDiameterChosen: number; // القطر المختار (يجب ألا يقل عن 12mm) [بند 21]
+  barDiameterChosen: number; // القطر المختار (لا يقل عن 12mm) [بند 21]
+  foundationType: FoundationType; // نوع الأساس للمنطق الذكي
 }
 
 export interface FlexureResults {
@@ -26,17 +31,24 @@ export interface FlexureResults {
   As_provided: number;        // مساحة التسليح المتاحة (mm²)
   bars_count: number;         // عدد الأسياخ المطلوبة
   spacing_mm: number;         // التباعد المحسوب بين الأسياخ (mm)
-  isSpacingSafe: boolean;     // هل يحقق شرط (100mm - 200mm) [بند 21]
+  isSpacingSafe: boolean;     // هل يحقق شرط التباعد الكودي
   projection: number;         // طول الظفر الحرج (m)
   detailingMessage: string;
 }
 
-/** تصميم الانحناء والتسليح وفق الكود العربي السوري - ملحق 5 */
+/** تصميم الانحناء والتسليح وفق الكود العربي السوري - الملحق 5 */
 export function designFlexure(inputs: FlexureInputs): FlexureResults {
   const {
     P_ultimate, B_footing, L_footing, c_width, c_depth, d_effective,
-    f_y, f_c_prime, isSteelColumn, basePlateDepth = 0, barDiameterChosen
+    f_y, f_c_prime, isSteelColumn, basePlateDepth = 0, barDiameterChosen,
+    foundationType
   } = inputs;
+
+  // ── تحديد حدود التباعد حسب نوع الأساس ──
+  // منفرد/مستمر: 100mm ≤ spacing ≤ 200mm [بند 21]
+  // حصيرة/مشترك: 100mm ≤ spacing ≤ 250mm [بند 9]
+  const isRaftOrCombined = foundationType === 'mat' || foundationType === 'combined';
+  const maxSpacing = isRaftOrCombined ? 250 : 200;
 
   // 1. تحديد موقع القطاع الحرج وحساب ذراع الظفر [بند 20]
   let projection = 0;
@@ -50,6 +62,7 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
   }
 
   // 2. حساب العزم الأقصى الحدي (M_u) عند القطاع الحرج
+  // يعتمد فقط على "ظفر القاعدة الصاعد" تحت تأثير ضغط التربة
   const net_soil_pressure_u = P_ultimate / (B_footing * L_footing);
   const M_u = (net_soil_pressure_u * B_footing * Math.pow(projection, 2)) / 2;
 
@@ -58,7 +71,6 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
   const b_width_mm = B_footing * 1000;
   const d_mm = d_effective * 1000;
 
-  // حساب مساحة الحديد بالطريقة التقريبية الدقيقة لـ ULS
   const Rn = (M_u * Math.pow(10, 6)) / (phi * b_width_mm * Math.pow(d_mm, 2));
   const m = f_y / (0.85 * f_c_prime);
   const discriminant = 1 - (2 * m * Rn) / f_y;
@@ -68,7 +80,6 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
     const rho = (1 / m) * (1 - Math.sqrt(discriminant));
     As_required = rho * b_width_mm * d_mm;
   } else {
-    // المقاطع فوق المتوازن - يلزم زيادة سماكة الأساس
     As_required = 0.05 * b_width_mm * d_mm;
   }
 
@@ -80,22 +91,23 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
     As_required = As_minimum;
   }
 
-  // 5. حساب عدد الأسياخ والتباعد بناءً على القطر المختار (يجب ألا يقل عن 12mm) [بند 21]
+  // 5. حساب عدد الأسياخ والتباعد
   const single_bar_area = (Math.PI * Math.pow(barDiameterChosen, 2)) / 4;
   let bars_count = Math.ceil(As_required / single_bar_area);
   const As_provided = single_bar_area * bars_count;
 
-  // حساب التباعد بين الأسياخ (Spacing) مع الغطاء الجانبي 50mm
   let spacing_mm = Math.floor((B_footing * 1000 - 2 * 50) / (bars_count - 1));
 
-  // 6. التحقق من اشتراطات التباعد الصارمة للكود السوري (100mm ≤ spacing ≤ 200mm) [بند 21]
+  // 6. التحقق من اشتراطات التباعد الكودية
   let isSpacingSafe = true;
   let detailingMessage = 'توزيع التسليح متوافق مع اشتراطات الملحق 5';
 
-  if (spacing_mm > 200) {
-    spacing_mm = 200;
+  if (spacing_mm > maxSpacing) {
+    spacing_mm = maxSpacing;
     bars_count = Math.ceil((B_footing * 1000 - 2 * 50) / spacing_mm) + 1;
-    detailingMessage = 'تم تقييد التباعد للحد الأقصى الكودي (200mm) وزيادة عدد الأسياخ لمنع التشقق';
+    detailingMessage = isRaftOrCombined
+      ? `تم تقييد التباعد للحد الأقصى للحصيرة (${maxSpacing}mm) وزيادة عدد الأسياخ`
+      : `تم تقييد التباعد للحد الأقصى الكودي (${maxSpacing}mm) وزيادة عدد الأسياخ لمنع التشقق`;
   } else if (spacing_mm < 100) {
     isSpacingSafe = false;
     detailingMessage = 'التباعد أقل من الحد الأدنى الكودي (100mm)، يرجى زيادة سماكة الأساس أو قطر السيخ!';
@@ -103,7 +115,7 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
 
   if (barDiameterChosen < 12) {
     isSpacingSafe = false;
-    detailingMessage += ' | القطر المختار أقل من 12mm المسموح بها للأساسات الرئيسية!';
+    detailingMessage += ' | القطر المختار أقل من 12mm المسموح بها للأساسات!';
   }
 
   return {
@@ -116,5 +128,63 @@ export function designFlexure(inputs: FlexureInputs): FlexureResults {
     isSpacingSafe,
     projection: Number(projection.toFixed(3)),
     detailingMessage,
+  };
+}
+
+/**
+ * تصميم التسليح العلوي للحصيرة/المشترك
+ * شبكة علوية كاملة مستمرة لمقاومة العزوم المستمرة بين الأعمدة والمجازات
+ * تباعد أقصى 250mm، قطر أدنى 12mm [بند 9]
+ */
+export function designRaftTopRebar(inputs: {
+  B_footing: number;
+  L_footing: number;
+  d_effective: number;
+  f_y: number;
+  barDiameterChosen: number;
+  M_u_bottom: number; // العزم السفلي لتقدير العلوي
+}): { spacing_mm: number; count: number; areaProvided: number; areaRequired: number; diameter: number } {
+  const { B_footing, L_footing, d_effective, f_y, barDiameterChosen, M_u_bottom } = inputs;
+
+  // تقدير العزم العلوي السلبي كنسبة من العزم السفلي الإيجابي
+  // في الحصيرة: العزم السلبي فوق الأعمدة ≈ 0.5-0.7 من العزم الإيجابي
+  const M_u_top = M_u_bottom * 0.65;
+
+  const b_width_mm = B_footing * 1000;
+  const d_mm = d_effective * 1000;
+
+  // حساب التسليح العلوي
+  const rho_min = f_y >= 400 ? 0.0018 : 0.0020;
+  const As_minimum = rho_min * b_width_mm * d_mm;
+
+  let As_required = As_minimum;
+  if (M_u_top > 0) {
+    const phi = 0.9;
+    const f_c_prime_est = 25; // تقدير
+    const Rn = (M_u_top * 1e6) / (phi * b_width_mm * d_mm * d_mm);
+    const m_ratio = f_y / (0.85 * f_c_prime_est);
+    const disc = 1 - (2 * m_ratio * Rn) / f_y;
+    if (disc >= 0) {
+      const rho = (1 / m_ratio) * (1 - Math.sqrt(disc));
+      As_required = Math.max(rho * b_width_mm * d_mm, As_minimum);
+    }
+  }
+
+  const single_bar_area = (Math.PI * barDiameterChosen * barDiameterChosen) / 4;
+  let count = Math.ceil(As_required / single_bar_area);
+  let spacing_mm = Math.floor((B_footing * 1000 - 2 * 50) / (count - 1));
+
+  // تباعد أقصى 250mm للحصيرة [بند 9]
+  if (spacing_mm > 250) {
+    spacing_mm = 250;
+    count = Math.ceil((B_footing * 1000 - 2 * 50) / spacing_mm) + 1;
+  }
+
+  return {
+    diameter: barDiameterChosen,
+    spacing_mm,
+    count,
+    areaProvided: single_bar_area * count,
+    areaRequired: As_required,
   };
 }

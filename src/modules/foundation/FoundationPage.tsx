@@ -17,8 +17,8 @@ import { calculateFoundation } from './calculations';
 
 const FOUNDATION_TYPE_LABELS: Record<string, { ar: string; en: string }> = {
   isolated: { ar: 'أساس منفرد', en: 'Isolated Foundation' },
+  continuous: { ar: 'أساس مستمر', en: 'Continuous Foundation' },
   combined: { ar: 'أساس مشترك', en: 'Combined Foundation' },
-  strap: { ar: 'أساس لَبّي', en: 'Strap Foundation' },
   mat: { ar: 'حصيرة عامة', en: 'Mat/Raft Foundation' },
 };
 

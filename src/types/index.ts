@@ -52,8 +52,8 @@ export function rebarGroupArea(diameter: number, count: number): number {
   return rebarArea(diameter) * count;
 }
 
-/** أنواع الأساسات */
-export type FoundationType = 'isolated' | 'combined' | 'strap' | 'mat';
+/** أنواع الأساسات - وفق التصنيف الكودي السوري */
+export type FoundationType = 'isolated' | 'continuous' | 'combined' | 'mat';
 
 /** أنواع الجوائز */
 export type BeamType = 'simply-supported' | 'continuous' | 'cantilever' | 't-beam';

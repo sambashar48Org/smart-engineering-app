@@ -1,7 +1,10 @@
 // ============================================================
 // محرك حسابات الأساسات - نقطة الدخول الرئيسية
 // الكود العربي السوري 2024 - ملحق 5
-// الرموز الكودية: V, t, D_f, σ₁, σ₂, q_magnified, f'_c, f_y, c_w, δ
+// المنطق الذكي:
+//   - منفرد/مستمر: تسليح سفلي فقط (ظفر القاعدة)، بدون علوي
+//   - حصيرة/مشترك: شبكتان كاملتان + تحقق جساءة [بند 11]
+//   - معامل التكبير الديناميكي q_magnified حسب σ₂/σ₁
 // ============================================================
 
 import type { FoundationInputs, FoundationResults } from '@/stores/foundationStore';
@@ -10,12 +13,14 @@ import { SYRIAN_CONCRETE_GRADES, SYRIAN_STEEL_GRADES } from '@/types';
 import { calculateSyrianSoilStresses } from './bearingCapacity';
 import { checkStability } from './stabilityCheck';
 import { calculateShearAndPunching } from './punchingShear';
-import { designFlexure } from './flexureDesign';
+import { designFlexure, designRaftTopRebar } from './flexureDesign';
+
+const NO_REBAR = { diameter: 0, spacing: 0, count: 0, areaProvided: 0, areaRequired: 0 };
 
 /** حساب كامل للأساس وفق الكود العربي السوري */
 export function calculateFoundation(inputs: FoundationInputs): FoundationResults {
   const {
-    B, L, D_f, t,
+    type, B, L, D_f, t,
     V, M_x, M_y, H,
     loadCase, q_allowable, soilDensity: gamma,
     c_w, delta_friction, E_passive, E_active, U_uplift,
@@ -23,22 +28,28 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     columnWidth: c1, columnDepth: c2,
     isSteelColumn, basePlateWidth, basePlateDepth,
     barDiameterChosen, betaEccentricity,
+    maxColumnSpacing,
   } = inputs;
 
+  // ── تصنيف النوع ──
+  const isRaftOrCombined = type === 'mat' || type === 'combined';
+  const isIsolatedOrStrip = type === 'isolated' || type === 'continuous';
+
   // ── قيم المواد ──
-  const f_c_prime = SYRIAN_CONCRETE_GRADES[concreteGrade] ?? 25; // المقاومة الأسطوانية الإنشائية f'_c
-  const f_y = SYRIAN_STEEL_GRADES[steelGrade] ?? 400;             // إجهاد الخضوع f_y
+  const f_c_prime = SYRIAN_CONCRETE_GRADES[concreteGrade] ?? 25;
+  const f_y = SYRIAN_STEEL_GRADES[steelGrade] ?? 400;
 
   // ── الارتفاع الفعال d (m) ──
-  const d_effective = (t * 1000 - cover - 10) / 1000; // cover بالـ mm
+  const d_effective = (t * 1000 - cover - 10) / 1000;
 
   // ── وزن الأساس والتربة ──
-  const foundationWeight = B * L * t * 24; // خرسانة 24 kN/m³
+  const foundationWeight = B * L * t * 24;
   const soilWeight = B * L * (D_f - t) * gamma;
   const totalVerticalService = V + foundationWeight + soilWeight;
 
   // ══════════════════════════════════════
   // 1. حساب إجهاد التربة (SLS - تشغيلي)
+  // معامل التكبير الديناميكي حسب σ₂/σ₁
   // ══════════════════════════════════════
   const soilResults = calculateSyrianSoilStresses({
     B, L,
@@ -51,8 +62,8 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // ══════════════════════════════════════
   // 2. تحققات الاستقرار (SLS - تشغيلي)
   // ══════════════════════════════════════
-  const M_overturning = M_x + H * D_f; // عزم القلب
-  const M_stabilizing = totalVerticalService * (B / 2); // عزم التثبيت
+  const M_overturning = M_x + H * D_f;
+  const M_stabilizing = totalVerticalService * (B / 2);
 
   const stabilityResults = checkStability({
     M_stabilizing,
@@ -71,8 +82,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // ══════════════════════════════════════
   // 3. القص والقص الثاقب (ULS - حدّي)
   // ══════════════════════════════════════
-  // تصعيد الحمولات للطريقة الحدية
-  const P_ultimate = V * 1.35 + foundationWeight * 1.35; // تبسيط
+  const P_ultimate = V * 1.35 + foundationWeight * 1.35;
 
   const shearResults = calculateShearAndPunching({
     P_ultimate,
@@ -91,7 +101,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // ══════════════════════════════════════
   // 4. الانحناء والتسليح (ULS - حدّي)
   // ══════════════════════════════════════
-  // تسليح اتجاه X (الطول)
+  // تسليح سفلي اتجاه X
   const flexureX = designFlexure({
     P_ultimate,
     B_footing: B,
@@ -104,9 +114,10 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     isSteelColumn,
     basePlateDepth,
     barDiameterChosen,
+    foundationType: type,
   });
 
-  // تسليح اتجاه Y (العرض)
+  // تسليح سفلي اتجاه Y
   const flexureY = designFlexure({
     P_ultimate,
     B_footing: L,
@@ -119,20 +130,79 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     isSteelColumn,
     basePlateDepth,
     barDiameterChosen,
+    foundationType: type,
   });
 
-  // تسليح علوي أدنى (انكماش)
-  const rhoMin = f_y >= 400 ? 0.0018 : 0.0020;
-  const AsMinX = rhoMin * (B * 1000) * (d_effective * 1000);
-  const AsMinY = rhoMin * (L * 1000) * (d_effective * 1000);
-  const topBarArea = (Math.PI * barDiameterChosen * barDiameterChosen) / 4;
-  const topCountX = Math.ceil(AsMinX / topBarArea);
-  const topCountY = Math.ceil(AsMinY / topBarArea);
-  const topSpacingX = Math.min(200, Math.floor((B * 1000 - 100) / Math.max(topCountX, 1)));
-  const topSpacingY = Math.min(200, Math.floor((L * 1000 - 100) / Math.max(topCountY, 1)));
+  // ── التسليح العلوي: المنطق الذكي ──
+  let topRebarX = { ...NO_REBAR };
+  let topRebarY = { ...NO_REBAR };
+  let topRebarRequired = false;
+  let topRebarMessage = '';
+
+  if (isIsolatedOrStrip) {
+    // ═══ منفرد/مستمر: إلغاء كامل للتسليح العلوي ═══
+    topRebarRequired = false;
+    topRebarMessage = 'غير مطلوب إنشائياً كودياً (توفير هدر)';
+    // topRebarX و topRebarY يبقيان NO_REBAR (diameter=0)
+  } else if (isRaftOrCombined) {
+    // ═══ حصيرة/مشترك: شبكتان كاملتان مستمرتان ═══
+    topRebarRequired = true;
+    topRebarMessage = 'شبكة علوية مستمرة لمقاومة العزوم السلبية بين الأعمدة والمجازات [بند 9]';
+
+    const topX = designRaftTopRebar({
+      B_footing: B,
+      L_footing: L,
+      d_effective,
+      f_y,
+      barDiameterChosen,
+      M_u_bottom: flexureX.M_u,
+    });
+
+    const topY = designRaftTopRebar({
+      B_footing: L,
+      L_footing: B,
+      d_effective,
+      f_y,
+      barDiameterChosen,
+      M_u_bottom: flexureY.M_u,
+    });
+
+    topRebarX = {
+      diameter: topX.diameter,
+      spacing: topX.spacing_mm,
+      count: topX.count,
+      areaProvided: topX.areaProvided,
+      areaRequired: topX.areaRequired,
+    };
+    topRebarY = {
+      diameter: topY.diameter,
+      spacing: topY.spacing_mm,
+      count: topY.count,
+      areaProvided: topY.areaProvided,
+      areaRequired: topY.areaRequired,
+    };
+  }
 
   // ══════════════════════════════════════
-  // 5. تجميع التحققات الموحدة
+  // 5. تحقق جساءة الحصيرة [بند 11]
+  // ══════════════════════════════════════
+  let raftStiffnessCheck: FoundationResults['raftStiffnessCheck'] = undefined;
+
+  if (type === 'mat') {
+    const minThickness = maxColumnSpacing / 8;
+    const isRigid = t >= minThickness;
+    raftStiffnessCheck = {
+      isRigid,
+      minThickness: Number(minThickness.toFixed(3)),
+      actualThickness: t,
+      message: isRigid
+        ? '✅ الحصيرة تعمل كجسم صلد وفق [بند 11] - السمك كافٍ'
+        : `❌ الحصيرة لا تعمل كجسم صلد وفق [بند 11] - سمك الحصيرة (${t}m) أقل من الحد الأدنى (${minThickness.toFixed(3)}m = أكبر مسافة بين أعمدة / 8)`,
+    };
+  }
+
+  // ══════════════════════════════════════
+  // 6. تجميع التحققات الموحدة
   // ══════════════════════════════════════
   const checks: CheckResult[] = [
     makeCheck(
@@ -186,6 +256,21 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     ),
   ];
 
+  // إضافة تحقق جساءة الحصيرة
+  if (raftStiffnessCheck) {
+    checks.push(
+      makeCheck(
+        'Raft Stiffness',
+        'تحقق جساءة الحصيرة [بند 11]',
+        raftStiffnessCheck.actualThickness,
+        raftStiffnessCheck.minThickness,
+        'm',
+        raftStiffnessCheck.isRigid,
+        raftStiffnessCheck.message
+      )
+    );
+  }
+
   return {
     // إجهاد التربة
     sigma_1: soilResults.sigma_1,
@@ -230,20 +315,15 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
       areaProvided: flexureY.As_provided,
       areaRequired: flexureY.As_required,
     },
-    topRebarX: {
-      diameter: barDiameterChosen,
-      spacing: topSpacingX,
-      count: topCountX,
-      areaProvided: topBarArea * topCountX,
-      areaRequired: AsMinX,
-    },
-    topRebarY: {
-      diameter: barDiameterChosen,
-      spacing: topSpacingY,
-      count: topCountY,
-      areaProvided: topBarArea * topCountY,
-      areaRequired: AsMinY,
-    },
+    topRebarX,
+    topRebarY,
+
+    // المنطق الذكي
+    topRebarRequired,
+    topRebarMessage,
+
+    // جساءة الحصيرة
+    raftStiffnessCheck,
 
     // التحققات
     checks,
@@ -269,10 +349,11 @@ function makeCheck(
   const ratio = limit > 0 ? value / limit : 0;
   let status: CheckStatus;
   if (name.includes('Stability') || name.includes('Buoyancy')) {
-    // للمعاملات الأمنية: FS >= limit هو الآمن
+    status = ratio >= 1.0 ? 'pass' : ratio >= 0.9 ? 'warn' : 'fail';
+  } else if (name.includes('Stiffness')) {
+    // للجساءة: value >= limit هو الآمن (السمك >= الحد الأدنى)
     status = ratio >= 1.0 ? 'pass' : ratio >= 0.9 ? 'warn' : 'fail';
   } else {
-    // للإجهادات: value <= limit هو الآمن
     status = ratio <= 0.8 ? 'pass' : ratio <= 1.0 ? 'warn' : 'fail';
   }
 
