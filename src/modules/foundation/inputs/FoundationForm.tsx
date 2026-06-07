@@ -25,19 +25,19 @@ const LOAD_CASES: { value: LoadCase; labelAr: string; labelEn: string; color: st
 ];
 
 const CONCRETE_GRADES = [
-  { value: 'C20/25', label: 'C20/25' },
-  { value: 'C25/30', label: 'C25/30' },
-  { value: 'C30/37', label: 'C30/37' },
-  { value: 'C35/45', label: 'C35/45' },
-  { value: 'C40/50', label: 'C40/50' },
+  { value: 'C20/25', label: "f'c=20" },
+  { value: 'C25/30', label: "f'c=25" },
+  { value: 'C30/37', label: "f'c=30" },
+  { value: 'C35/45', label: "f'c=35" },
+  { value: 'C40/50', label: "f'c=40" },
 ];
 
 const STEEL_GRADES = [
-  { value: 'B240', label: 'B240' },
-  { value: 'B300', label: 'B300' },
-  { value: 'B400', label: 'B400' },
-  { value: 'B500', label: 'B500' },
-  { value: 'B520', label: 'B520' },
+  { value: 'B240', label: 'fy=240' },
+  { value: 'B300', label: 'fy=300' },
+  { value: 'B400', label: 'fy=400' },
+  { value: 'B500', label: 'fy=500' },
+  { value: 'B520', label: 'fy=520' },
 ];
 
 const BAR_DIAMETERS = [
