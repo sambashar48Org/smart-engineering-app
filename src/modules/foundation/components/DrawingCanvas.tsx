@@ -1,132 +1,115 @@
 // ============================================================
-// مكون عرض الرسوم التفاعلية (Canvas)
+// مكون شاشة العرض الهندسي المطور (Canvas Framework)
 // ============================================================
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useFoundationStore } from '@/stores/foundationStore';
 import { useAppStore } from '@/stores/appStore';
-import { t } from '@/i18n';
 import { drawFoundationSection } from '@/modules/foundation/drawings/sectionView';
 import { drawPressureDiagram } from '@/modules/foundation/drawings/pressureDiagram';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 
-type DrawingTab = 'section' | 'pressure';
+type DrawingTab = 'structural' | 'soil_pressure';
 
 export default function DrawingCanvas() {
   const { inputs, results } = useFoundationStore();
   const { lang } = useAppStore();
-  const sectionCanvasRef = useRef<HTMLCanvasElement>(null);
-  const pressureCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [activeTab, setActiveTab] = useState<DrawingTab>('section');
-  const [zoom, setZoom] = useState(1);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [activeTab, setActiveTab] = useState<DrawingTab>('structural');
+  const [zoom, setZoom] = useState(1.0);
 
-  /** رسم كل الكانفاسات */
   const redraw = useCallback(() => {
-    // رسم المقطع العرضي
-    if (sectionCanvasRef.current) {
-      const canvas = sectionCanvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio * zoom;
-        canvas.height = rect.height * window.devicePixelRatio * zoom;
-        ctx.scale(window.devicePixelRatio * zoom, window.devicePixelRatio * zoom);
-        drawFoundationSection(ctx, { ...canvas, width: rect.width, height: rect.height } as HTMLCanvasElement, inputs, results);
-      }
-    }
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    // رسم مخطط الإجهاد
-    if (pressureCanvasRef.current) {
-      const canvas = pressureCanvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio * zoom;
-        canvas.height = rect.height * window.devicePixelRatio * zoom;
-        ctx.scale(window.devicePixelRatio * zoom, window.devicePixelRatio * zoom);
-        drawPressureDiagram(ctx, { ...canvas, width: rect.width, height: rect.height } as HTMLCanvasElement, inputs, results);
-      }
+    const rect = canvas.parentElement?.getBoundingClientRect();
+    const logicalWidth = rect?.width || 600;
+    const logicalHeight = rect?.height || 500;
+    canvas.width = logicalWidth * window.devicePixelRatio;
+    canvas.height = logicalHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio * zoom, window.devicePixelRatio * zoom);
+
+    // رسم على كانفاس بأبعاد منطقية
+    const logicalCanvas = { ...canvas, width: logicalWidth, height: logicalHeight } as HTMLCanvasElement;
+
+    if (activeTab === 'structural') {
+      drawFoundationSection(ctx, logicalCanvas, inputs, results, { showLabels: true });
+    } else {
+      drawPressureDiagram(ctx, logicalCanvas, inputs, results);
     }
-  }, [inputs, results, zoom]);
+  }, [inputs, results, activeTab, zoom]);
 
   useEffect(() => {
     redraw();
+    window.addEventListener('resize', redraw);
+    return () => window.removeEventListener('resize', redraw);
   }, [redraw]);
 
-  // ResizeObserver
+  // ResizeObserver للمراقبة الدقيقة
   useEffect(() => {
-    const activeCanvas = activeTab === 'section' ? sectionCanvasRef.current : pressureCanvasRef.current;
-    if (!activeCanvas) return;
-
+    if (!canvasRef.current?.parentElement) return;
     const observer = new ResizeObserver(() => {
       requestAnimationFrame(redraw);
     });
-    observer.observe(activeCanvas.parentElement!);
+    observer.observe(canvasRef.current.parentElement);
     return () => observer.disconnect();
-  }, [activeTab, redraw]);
-
-  const tabs: { id: DrawingTab; label: string }[] = [
-    { id: 'section', label: lang === 'ar' ? 'المقطع العرضي' : 'Section View' },
-    { id: 'pressure', label: lang === 'ar' ? 'توزيع الإجهاد' : 'Pressure Diagram' },
-  ];
+  }, [redraw]);
 
   return (
-    <div className="h-full flex flex-col">
-      {/* تبويبات */}
-      <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-100 bg-gray-50/50">
-        {tabs.map((tab) => (
+    <div className="flex flex-col h-full bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">
+      {/* شريط التبويبات والتحكم */}
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800">
+        <div className="flex gap-1.5">
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-100'
+            onClick={() => setActiveTab('structural')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'structural'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            {tab.label}
+            {lang === 'ar' ? '📐 المخطط الإنشائي المتكامل' : 'Structural Plan & Section'}
           </button>
-        ))}
+          <button
+            onClick={() => setActiveTab('soil_pressure')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'soil_pressure'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            {lang === 'ar' ? '📊 مخطط إجهادات التربة' : 'Soil Pressure Diagram'}
+          </button>
+        </div>
 
         {/* تحكم بالتكبير */}
-        <div className="mr-auto flex items-center gap-1">
+        <div className="flex items-center gap-2 bg-slate-900 px-2 py-1 rounded-md border border-slate-800">
           <button
-            onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}
-            className="w-6 h-6 rounded text-xs bg-gray-200 hover:bg-gray-300 flex items-center justify-center cursor-pointer"
+            onClick={() => setZoom(z => Math.max(0.7, z - 0.1))}
+            className="text-slate-400 hover:text-white p-1 cursor-pointer"
           >
-            −
+            <ZoomOut size={14} />
           </button>
-          <span className="text-xs text-gray-500 min-w-[3rem] text-center">
+          <span className="text-[11px] font-mono text-slate-500 w-10 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
-            onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
-            className="w-6 h-6 rounded text-xs bg-gray-200 hover:bg-gray-300 flex items-center justify-center cursor-pointer"
+            onClick={() => setZoom(z => Math.min(1.5, z + 0.1))}
+            className="text-slate-400 hover:text-white p-1 cursor-pointer"
           >
-            +
+            <ZoomIn size={14} />
           </button>
         </div>
       </div>
 
       {/* منطقة الرسم */}
-      <div className="flex-1 relative bg-white">
-        <canvas
-          ref={sectionCanvasRef}
-          className={`absolute inset-0 w-full h-full ${activeTab === 'section' ? 'block' : 'hidden'}`}
-        />
-        <canvas
-          ref={pressureCanvasRef}
-          className={`absolute inset-0 w-full h-full ${activeTab === 'pressure' ? 'block' : 'hidden'}`}
-        />
-
-        {/* علامة مائية إذا لم يُحسب بعد */}
+      <div className="flex-1 relative bg-white m-2 rounded-lg overflow-hidden">
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
         {!results.calculated && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80">
-            <div className="text-center space-y-2">
-              <div className="text-4xl">📐</div>
-              <p className="text-sm text-gray-400">
-                {lang === 'ar' ? 'أدخل البيانات واضغط "احسب" لعرض الرسم' : 'Enter data and click "Calculate" to see drawing'}
-              </p>
-            </div>
+          <div className="absolute inset-0 flex items-center justify-center bg-white/95 text-slate-400 text-xs font-medium">
+            {lang === 'ar' ? 'يرجى الضغط على زر الحساب لتوليد المخططات الهندسية' : 'Awaiting computation to render vector graphics...'}
           </div>
         )}
       </div>

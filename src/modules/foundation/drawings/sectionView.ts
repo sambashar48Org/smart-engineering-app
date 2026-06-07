@@ -1,19 +1,13 @@
 // ============================================================
-// رسم مقطع الأساس العرضي (Section View)
-// الكود العربي السوري 2024 - يدعم العمود المعدني والشد
-// المنطق الذكي:
-//   منفرد/مستمر = تسليح سفلي فقط (بدون شبكة علوية بصرياً)
-//   مشترك = شبكة علوية كاملة (عزم سالب بين العمودين)
-//   حصيرة = شبكتان كاملتان + شريحة العمود
-// الرموز الكودية: t, D_f, σ₁
+// محرك الرسم الهندسي الديناميكي المتكامل - الكود العربي السوري
+// يدعم التكيف الكامل مع: المنفرد، المستمر، المشترك، والحصيرة العامة بشرائحها
+// الرموز الكودية المعتمدة: B, L, t, D_f, columnWidth, columnDepth, inputs.type
 // ============================================================
 
-import type { FoundationInputs } from '@/stores/foundationStore';
-import type { FoundationResults } from '@/stores/foundationStore';
+import type { FoundationInputs, FoundationResults } from '@/stores/foundationStore';
 import type { DrawOptions } from '@/engine/drawing/canvasEngine';
-import { DEFAULT_DRAW_OPTIONS, drawFilledRect, drawDimensionLine, drawHatching, drawRebarDot, drawLabel } from '@/engine/drawing/canvasEngine';
+import { DEFAULT_DRAW_OPTIONS, drawDimensionLine, drawRebarDot, drawLabel } from '@/engine/drawing/canvasEngine';
 
-/** رسم المقطع العرضي الكامل */
 export function drawFoundationSection(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
@@ -22,352 +16,271 @@ export function drawFoundationSection(
   customOpts: Partial<DrawOptions> = {}
 ) {
   const opts = { ...DEFAULT_DRAW_OPTIONS, ...customOpts };
-  const { B, L, D_f, t, columnWidth: c1, columnDepth: c2, cover, isSteelColumn, basePlateWidth, basePlateDepth } = inputs;
+  const { B, L, D_f, t, columnWidth: c1, columnDepth: c2, cover, isSteelColumn } = inputs;
+  const fType = inputs.type;
 
-  // تصنيف النوع - فصل صارم للرسم
-  const isIsolatedOrStrip = inputs.type === 'isolated' || inputs.type === 'continuous';
-  const isCombined = inputs.type === 'combined';
-  const isRaft = inputs.type === 'mat';
-  const isRaftOrCombined = isRaft || isCombined;
-
-  // تنظيف Canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // حساب المقياس تلقائياً
-  const maxW = canvas.width - 200;
-  const maxH = canvas.height - 150;
-  const scaleX = maxW / (B * 1.2);
-  const scaleY = maxH / (D_f * 1.5);
-  const scale = Math.min(scaleX, scaleY);
+  const padding = 60;
+  const usableWidth = canvas.width - 2 * padding;
+  const usableHeight = canvas.height - 2 * padding;
 
-  // نقطة المركز
+  const scale = Math.min(usableWidth / (fType === 'continuous' ? B * 1.5 : B), (usableHeight / 2) / (t + 1.2));
   const centerX = canvas.width / 2;
-  const baseY = canvas.height - 80;
+  const planCenterY = padding + (usableHeight / 4);
+  const sectionCenterY = canvas.height - padding - (usableHeight / 4);
 
-  // أبعاد بالبكسل
-  const bPx = B * scale;
-  const dPx = D_f * scale;
-  const tPx = t * scale;
-  const c1Px = c1 * scale;
+  const footingW_px = B * scale;
+  const footingL_px = (fType === 'isolated' ? B : B * 1.4) * scale;
+  const colW_px = c1 * scale;
+  const colH_px = c2 * scale;
+  const cover_px = (cover / 1000) * scale;
 
-  // ─── التربة (خلفية) ───
-  ctx.fillStyle = '#fef3c7';
-  ctx.fillRect(centerX - bPx / 2 - 30, baseY - dPx, bPx + 60, dPx + 40);
+  // ═══════════════════════════════════════
+  // 1️⃣ رسم المسقط الأفقي المتكيف (PLAN VIEW)
+  // ═══════════════════════════════════════
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2.5;
+  ctx.fillStyle = '#f1f5f9';
 
-  drawHatching(
-    ctx,
-    centerX - bPx / 2 - 30,
-    baseY - dPx,
-    bPx + 60,
-    dPx + 40,
-    10,
-    45,
-    '#d97706'
-  );
-
-  // ─── جسم الأساس (الخرسانة) ───
-  drawFilledRect(
-    ctx,
-    centerX - bPx / 2,
-    baseY - tPx,
-    bPx,
-    tPx,
-    opts.concreteColor,
-    opts.color,
-    opts.lineWidth
-  );
-
-  drawHatching(
-    ctx,
-    centerX - bPx / 2,
-    baseY - tPx,
-    bPx,
-    tPx,
-    15,
-    -45,
-    '#a1a1aa'
-  );
-
-  // ─── العمود ───
-  const colHeight = dPx * 0.5;
-
-  if (isSteelColumn) {
-    // ═══ رسم العمود المعدني بقطاع I (I-beam Profile) ═══
-    const flangeWidth = c1Px * 0.9;   // عرض الجناح
-    const webWidth = c1Px * 0.15;     // سمك الروح
-    const flangeThickness = colHeight * 0.12; // سماكة الجناح
-    const colTop = baseY - tPx - colHeight;
-
-    // صفيحة الارتكاز (Base Plate) فوق سطح الخرسانة مباشرة
-    const bpW = (basePlateWidth || c1) * scale;
-    const bpH = Math.max(10, tPx * 0.06);
-    drawFilledRect(
-      ctx,
-      centerX - bpW / 2,
-      baseY - tPx - bpH,
-      bpW,
-      bpH,
-      '#475569',
-      '#1e293b',
-      opts.lineWidth + 1
-    );
-
-    // مسامير التثبيت (Anchor Bolts) - 4 مسامير على الأطراف
-    const boltRadius = 3;
-    const boltInsetX = bpW * 0.15;
-    const boltInsetY = bpH * 0.5;
-    ctx.fillStyle = '#94a3b8';
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
-    for (const dx of [-boltInsetX, boltInsetX]) {
-      for (const dy of [-boltInsetY, boltInsetY]) {
-        ctx.beginPath();
-        ctx.arc(centerX + dx, baseY - tPx - bpH / 2 + dy, boltRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-    }
-
-    // الجناح العلوي (Top Flange)
-    drawFilledRect(
-      ctx,
-      centerX - flangeWidth / 2,
-      colTop,
-      flangeWidth,
-      flangeThickness,
-      '#64748b',
-      '#475569',
-      opts.lineWidth
-    );
-
-    // الروح (Web) - خط عمودي رفيع
-    drawFilledRect(
-      ctx,
-      centerX - webWidth / 2,
-      colTop + flangeThickness,
-      webWidth,
-      colHeight - 2 * flangeThickness,
-      '#94a3b8',
-      '#475569',
-      opts.lineWidth
-    );
-
-    // الجناح السفلي (Bottom Flange) - يرتكز على صفيحة الارتكاز
-    drawFilledRect(
-      ctx,
-      centerX - flangeWidth / 2,
-      baseY - tPx - bpH - flangeThickness,
-      flangeWidth,
-      flangeThickness,
-      '#64748b',
-      '#475569',
-      opts.lineWidth
-    );
-
-    // خط القطاع الحرج للعمود المعدني (عند منتصف المسافة بين وجه الصفيحة وحافة الأساس)
-    const midPlate = ((basePlateDepth || c2) + c2) / 2 * scale;
-    const criticalLineX = centerX - bPx / 2 + (bPx - midPlate) / 2;
-
-    ctx.setLineDash([6, 3]);
-    ctx.beginPath();
-    ctx.moveTo(criticalLineX, baseY - tPx);
-    ctx.lineTo(criticalLineX, baseY);
-    ctx.strokeStyle = '#dc2626';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    drawLabel(ctx, 'القطاع الحرج', criticalLineX, baseY - tPx - 20, opts);
+  ctx.beginPath();
+  if (fType === 'isolated') {
+    ctx.rect(centerX - footingW_px / 2, planCenterY - footingW_px / 2, footingW_px, footingW_px);
   } else {
-    // ═══ عمود خرساني عادي ═══
-    drawFilledRect(
-      ctx,
-      centerX - c1Px / 2,
-      baseY - tPx - colHeight,
-      c1Px,
-      colHeight,
-      '#94a3b8',
-      opts.color,
-      opts.lineWidth
-    );
+    ctx.rect(centerX - footingL_px / 2, planCenterY - footingW_px / 2, footingL_px, footingW_px);
+  }
+  ctx.fill();
+  ctx.stroke();
 
-    // خط القطاع الحرج للعمود الخرساني (عند وجه العمود)
-    const criticalX = centerX - c1Px / 2;
-    ctx.setLineDash([6, 3]);
+  // رسم العمود/الأعمدة في المسقط
+  ctx.fillStyle = isSteelColumn ? '#475569' : '#cbd5e1';
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 2;
+
+  if (fType === 'combined') {
     ctx.beginPath();
-    ctx.moveTo(criticalX, baseY - tPx);
-    ctx.lineTo(criticalX, baseY);
-    ctx.strokeStyle = '#dc2626';
-    ctx.lineWidth = 1.5;
+    ctx.rect(centerX - footingL_px / 4 - colW_px / 2, planCenterY - colH_px / 2, colW_px, colH_px);
+    ctx.rect(centerX + footingL_px / 4 - colW_px / 2, planCenterY - colH_px / 2, colW_px, colH_px);
+    ctx.fill();
     ctx.stroke();
-    ctx.setLineDash([]);
-
-    drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - tPx - 20, opts);
+  } else {
+    ctx.beginPath();
+    ctx.rect(centerX - colW_px / 2, planCenterY - colH_px / 2, colW_px, colH_px);
+    ctx.fill();
+    ctx.stroke();
   }
 
-  // ══════════════════════════════════════
-  // التسليح - المنطق الذكي
-  // ══════════════════════════════════════
-  if (opts.showRebar && results.calculated) {
-    const dEffective = (t * 1000 - cover - 10) / 1000;
-    const rebarDepth = dEffective * scale;
-
-    // ── أسياخ سفلية (دائماً موجودة) ──
-    const rebarY = baseY - rebarDepth;
+  // خطوط شريحة العمود للحصيرة العامة
+  if (fType === 'mat') {
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.moveTo(centerX - bPx / 2 + 10, rebarY);
-    ctx.lineTo(centerX + bPx / 2 - 10, rebarY);
-    ctx.strokeStyle = opts.rebarColor;
-    ctx.lineWidth = 3;
+    ctx.moveTo(centerX - footingL_px / 3, planCenterY - footingW_px / 2);
+    ctx.lineTo(centerX - footingL_px / 3, planCenterY + footingW_px / 2);
+    ctx.moveTo(centerX + footingL_px / 3, planCenterY - footingW_px / 2);
+    ctx.lineTo(centerX + footingL_px / 3, planCenterY + footingW_px / 2);
     ctx.stroke();
+    ctx.setLineDash([]);
+    drawLabel(ctx, 'شريحة العمود Column Strip', centerX, planCenterY + footingW_px / 2 - 15, { ...opts, textColor: '#854d0e' });
+  }
 
-    // نقاط الأسياخ السفلية
-    if (results.bottomRebarX.diameter > 0) {
-      const spacing = results.bottomRebarX.spacing * scale / 1000;
-      const startX = centerX - bPx / 2 + 20;
-      const endX = centerX + bPx / 2 - 20;
-      for (let x = startX; x <= endX; x += Math.max(spacing, 15)) {
-        drawRebarDot(ctx, x, rebarY, 6, opts.rebarColor);
-      }
+  // تسمية المسقط الأفقي
+  drawLabel(ctx, `مسقط أفقي - ${fType === 'isolated' ? 'أساس منفرد' : fType === 'continuous' ? 'أساس مستمر' : fType === 'combined' ? 'أساس مشترك' : 'حصيرة عامة'}`, centerX, planCenterY - footingW_px / 2 - 20, opts);
+
+  // ═══════════════════════════════════════
+  // 2️⃣ رسم المقطع الرأسي المتكامل والتسليح (SECTION VIEW)
+  // ═══════════════════════════════════════
+  const t_px = t * scale;
+  const Df_px = D_f * scale;
+  const baseY = sectionCenterY + t_px / 2;
+
+  // جسم الأساس (الخرسانة)
+  ctx.fillStyle = '#f8fafc';
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.rect(centerX - footingW_px / 2, baseY - t_px, footingW_px, t_px);
+  ctx.fill();
+  ctx.stroke();
+
+  // التربة أسفل الأساس
+  ctx.fillStyle = '#fef3c7';
+  ctx.fillRect(centerX - footingW_px / 2 - 20, baseY, footingW_px + 40, Df_px * 0.4);
+  ctx.strokeStyle = '#d97706';
+  ctx.lineWidth = 0.5;
+  // خطوط التربة المائلة
+  for (let i = -footingW_px; i < footingW_px * 2; i += 10) {
+    ctx.beginPath();
+    ctx.moveTo(centerX - footingW_px / 2 - 20 + i, baseY);
+    ctx.lineTo(centerX - footingW_px / 2 - 20 + i + Df_px * 0.4, baseY + Df_px * 0.4);
+    ctx.stroke();
+  }
+
+  // رسم العمود فوق الأساس
+  const colDrawHeight = 60;
+  if (isSteelColumn) {
+    // ═══ عمود معدني بقطاع I في المقطع ═══
+    const flangeW = colW_px * 0.9;
+    const webW = colW_px * 0.15;
+    const flangeT = colDrawHeight * 0.12;
+
+    // صفيحة الارتكاز
+    const bpW = (inputs.basePlateWidth || c1) * scale;
+    const bpH = Math.max(6, t_px * 0.04);
+    ctx.fillStyle = '#475569';
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(centerX - bpW / 2, baseY - t_px - bpH, bpW, bpH);
+    ctx.strokeRect(centerX - bpW / 2, baseY - t_px - bpH, bpW, bpH);
+
+    // مسامير التثبيت
+    const boltR = 2;
+    ctx.fillStyle = '#94a3b8';
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 0.5;
+    for (const dx of [-bpW * 0.35, bpW * 0.35]) {
+      ctx.beginPath();
+      ctx.arc(centerX + dx, baseY - t_px - bpH / 2, boltR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
 
-    // تسمية التسليح السفلي
-    drawLabel(ctx, 'فرش سفلي', centerX + bPx / 2 + 5, rebarY + 5, opts);
+    // الجناح السفلي
+    const botFlangeY = baseY - t_px - bpH - flangeT;
+    ctx.fillStyle = '#64748b';
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1;
+    ctx.fillRect(centerX - flangeW / 2, botFlangeY, flangeW, flangeT);
+    ctx.strokeRect(centerX - flangeW / 2, botFlangeY, flangeW, flangeT);
+
+    // الروح (Web)
+    const webTop = botFlangeY - (colDrawHeight - 2 * flangeT);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(centerX - webW / 2, webTop, webW, colDrawHeight - 2 * flangeT - bpH);
+    ctx.strokeRect(centerX - webW / 2, webTop, webW, colDrawHeight - 2 * flangeT - bpH);
+
+    // الجناح العلوي
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(centerX - flangeW / 2, webTop - flangeT, flangeW, flangeT);
+    ctx.strokeRect(centerX - flangeW / 2, webTop - flangeT, flangeW, flangeT);
+
+    drawLabel(ctx, 'عمود معدني (I)', centerX, webTop - flangeT - 12, { ...opts, textColor: '#475569' });
+  } else {
+    // ═══ عمود خرساني ═══
+    ctx.fillStyle = '#f1f5f9';
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(centerX - colW_px / 2, baseY - t_px - colDrawHeight, colW_px, colDrawHeight);
+    ctx.fill();
+    ctx.stroke();
+
+    drawLabel(ctx, 'عمود خرساني', centerX, baseY - t_px - colDrawHeight - 12, { ...opts, textColor: '#475569' });
+  }
+
+  // ═══════════════════════════════════════
+  // التسليح في المقطع الرأسي
+  // ═══════════════════════════════════════
+  if (results.calculated) {
+    const isIsolatedOrStrip = fType === 'isolated' || fType === 'continuous';
+    const isCombined = fType === 'combined';
+    const isRaft = fType === 'mat';
+
+    // ── أسياخ سفلية (دائماً) ──
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(centerX - footingW_px / 2 + cover_px, baseY - t_px + cover_px + 15);
+    ctx.lineTo(centerX - footingW_px / 2 + cover_px, baseY - cover_px);
+    ctx.lineTo(centerX + footingW_px / 2 - cover_px, baseY - cover_px);
+    ctx.lineTo(centerX + footingW_px / 2 - cover_px, baseY - t_px + cover_px + 15);
+    ctx.stroke();
+
+    const dotCount = 8;
+    const stepX = (footingW_px - 2 * cover_px) / (dotCount - 1);
+    for (let i = 0; i < dotCount; i++) {
+      drawRebarDot(ctx, centerX - footingW_px / 2 + cover_px + i * stepX, baseY - cover_px - 6, 3.5, '#1d4ed8');
+    }
+
+    // ── تسمية التسليح السفلي ──
+    drawLabel(ctx, 'فرش سفلي', centerX + footingW_px / 2 + 5, baseY - cover_px, { ...opts, textColor: '#1d4ed8' });
 
     // ══════════════════════════════════════════════════
     // أسياخ علوية - الفصل الصارم حسب نوع الأساس
     // ══════════════════════════════════════════════════
     if (isIsolatedOrStrip) {
-      // ═══ منفرد/مستمر: إلغاء كامل بصري - لا خطوط ولا أسياخ علوية ═══
+      // منفرد/مستمر: لا تسليح علوي بصرياً
       // الأساس المنفرد والمستمر لا يتطلب تسليحاً علويّاً كودياً
-      // المقطع يظهر خاوياً من الحديد العلوي
-      // (لا نرسم أي شيء هنا - التسليح السفلي فقط)
     } else if ((isCombined || isRaft) && results.topRebarRequired) {
-      // ═══ مشترك/حصيرة: شبكة علوية كاملة ═══
-      const topRebarY = baseY - tPx + 20;
+      // مشترك/حصيرة: شبكة علوية كاملة
+      ctx.strokeStyle = '#b91c1c';
       ctx.beginPath();
-      ctx.moveTo(centerX - bPx / 2 + 10, topRebarY);
-      ctx.lineTo(centerX + bPx / 2 - 10, topRebarY);
-      ctx.strokeStyle = '#f97316';
-      ctx.lineWidth = 3;
+      ctx.moveTo(centerX - footingW_px / 2 + cover_px, baseY - cover_px - 15);
+      ctx.lineTo(centerX - footingW_px / 2 + cover_px, baseY - t_px + cover_px);
+      ctx.lineTo(centerX + footingW_px / 2 - cover_px, baseY - t_px + cover_px);
+      ctx.lineTo(centerX + footingW_px / 2 - cover_px, baseY - cover_px - 15);
       ctx.stroke();
 
-      // نقاط الأسياخ العلوية
-      if (results.topRebarX.diameter > 0) {
-        const topSpacing = results.topRebarX.spacing * scale / 1000;
-        const startX = centerX - bPx / 2 + 20;
-        const endX = centerX + bPx / 2 - 20;
-        for (let x = startX; x <= endX; x += Math.max(topSpacing, 15)) {
-          drawRebarDot(ctx, x, topRebarY, 6, '#f97316');
-        }
+      for (let i = 0; i < dotCount; i++) {
+        drawRebarDot(ctx, centerX - footingW_px / 2 + cover_px + i * stepX, baseY - t_px + cover_px + 6, 3.5, '#2563eb');
       }
 
-      // تسمية التسليح العلوي - إزاحة رأسية 40px لمنع التداخل
-      const topLabelY = topRebarY + 40;
+      // تسمية التسليح العلوي - إزاحة رأسية لمنع التداخل
+      const topLabelY = baseY - t_px + cover_px + 30;
       if (isCombined) {
-        drawLabel(ctx, 'شبكة علوية (عزم سالب بين العمودين)', centerX + bPx / 2 + 5, topLabelY, opts);
+        drawLabel(ctx, 'شبكة علوية (عزم سالب بين العمودين)', centerX + footingW_px / 2 + 5, topLabelY, { ...opts, textColor: '#b91c1c' });
       } else {
-        drawLabel(ctx, 'شبكة علوية كاملة + شريحة العمود', centerX + bPx / 2 + 5, topLabelY, opts);
+        drawLabel(ctx, 'شبكة علوية كاملة + شريحة العمود', centerX + footingW_px / 2 + 5, topLabelY, { ...opts, textColor: '#b91c1c' });
       }
     }
-  }
 
-  // ─── منطقة الشد (إن وجدت) ───
-  if (results.calculated && results.hasTension) {
-    const compressedFraction = results.compressedLength / L;
-    const tensionStartX = centerX - bPx / 2;
-    const tensionWidth = bPx * (1 - compressedFraction);
+    // ── حديد إضافي لشريحة العمود (حصيرة فقط) ──
+    if (isRaft) {
+      ctx.strokeStyle = '#9333ea';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(centerX - colW_px * 1.5, baseY - t_px + cover_px + 3);
+      ctx.lineTo(centerX + colW_px * 1.5, baseY - t_px + cover_px + 3);
+      ctx.stroke();
+      drawLabel(ctx, 'حديد إضافي لشريحة العمود', centerX, baseY - t_px + cover_px + 20, { ...opts, textColor: '#6b21a8' });
+    }
 
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
-    ctx.fillRect(tensionStartX, baseY - tPx, tensionWidth, tPx);
+    // ── منطقة الشد (إن وجدت) ──
+    if (results.hasTension) {
+      const compressedFraction = results.compressedLength / L;
+      const tensionStartX = centerX - footingW_px / 2 + footingW_px * compressedFraction;
+      const tensionWidth = footingW_px * (1 - compressedFraction);
 
-    ctx.font = 'bold 12px Cairo, sans-serif';
-    ctx.fillStyle = '#dc2626';
-    ctx.textAlign = 'center';
-    ctx.fillText('منطقة شد', tensionStartX + tensionWidth / 2, baseY - tPx / 2);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+      ctx.fillRect(tensionStartX, baseY - t_px, tensionWidth, t_px);
+
+      ctx.font = 'bold 11px Cairo, sans-serif';
+      ctx.fillStyle = '#dc2626';
+      ctx.textAlign = 'center';
+      ctx.fillText('منطقة شد', tensionStartX + tensionWidth / 2, baseY - t_px / 2);
+    }
+
+    // ── إجهاد التربة ──
+    drawLabel(ctx, `σ₁ = ${results.sigma_1} kN/m²`, centerX, baseY + Df_px * 0.4 + 20, opts);
   }
 
   // ─── خطوط الأبعاد ───
-  if (opts.showDimensions) {
-    drawDimensionLine(
-      ctx,
-      centerX - bPx / 2,
-      baseY + 15,
-      centerX + bPx / 2,
-      baseY + 15,
-      `B = ${B} m`,
-      30,
-      opts
-    );
-
-    drawDimensionLine(
-      ctx,
-      centerX + bPx / 2 + 15,
-      baseY,
-      centerX + bPx / 2 + 15,
-      baseY - tPx,
-      `t = ${t} m`,
-      30,
-      opts
-    );
-
-    drawDimensionLine(
-      ctx,
-      centerX - bPx / 2 - 15,
-      baseY,
-      centerX - bPx / 2 - 15,
-      baseY - dPx,
-      `D_f = ${D_f} m`,
-      30,
-      opts
-    );
-
-    drawDimensionLine(
-      ctx,
-      centerX - c1Px / 2,
-      baseY - tPx - colHeight - 10,
-      centerX + c1Px / 2,
-      baseY - tPx - colHeight - 10,
-      `${c1} m`,
-      15,
-      opts
-    );
-  }
-
-  // ─── التسميات ───
-  if (opts.showLabels) {
-    drawLabel(ctx, 'خرسانة', centerX, baseY - tPx / 2, opts);
-
-    if (isSteelColumn) {
-      drawLabel(ctx, 'عمود معدني (I)', centerX, baseY - tPx - colHeight / 2, opts);
-    } else {
-      drawLabel(ctx, 'عمود خرساني', centerX, baseY - tPx - colHeight / 2, opts);
-    }
-
-    drawLabel(ctx, 'تربة', centerX + bPx / 2 - 30, baseY - dPx + 20, opts);
-
-    if (results.calculated) {
-      drawLabel(
-        ctx,
-        `σ₁ = ${results.sigma_1} kN/m²`,
-        centerX,
-        baseY + 55,
-        opts
-      );
-    }
-  }
+  drawDimensionLine(ctx, centerX - footingW_px / 2, baseY + 15, centerX + footingW_px / 2, baseY + 15, `B = ${B} m`, 20, opts);
+  drawDimensionLine(ctx, centerX + footingW_px / 2 + 20, baseY - t_px, centerX + footingW_px / 2 + 20, baseY, `t = ${t} m`, 20, opts);
+  drawLabel(ctx, 'مقطع رأسي تفصيلي SECTION', centerX, baseY + 50, { ...opts, textColor: '#475569' });
 
   // ─── خط مستوى التأسيس ───
-  const groundLevel = baseY - dPx;
+  const groundLevel = baseY - t_px - Df_px * 0.1;
   ctx.setLineDash([8, 4]);
   ctx.beginPath();
-  ctx.moveTo(centerX - bPx / 2 - 40, groundLevel);
-  ctx.lineTo(centerX + bPx / 2 + 40, groundLevel);
+  ctx.moveTo(centerX - footingW_px / 2 - 30, groundLevel);
+  ctx.lineTo(centerX + footingW_px / 2 + 30, groundLevel);
   ctx.strokeStyle = '#16a34a';
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.setLineDash([]);
-  drawLabel(ctx, 'مستوى التأسيس', centerX + bPx / 2 + 20, groundLevel - 10, opts);
+  drawLabel(ctx, 'مستوى التأسيس', centerX + footingW_px / 2 + 20, groundLevel - 10, { ...opts, textColor: '#16a34a' });
 
   // ─── شارة الكود السوري ───
   ctx.font = '10px Cairo, sans-serif';

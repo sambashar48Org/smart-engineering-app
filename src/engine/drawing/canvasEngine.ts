@@ -9,6 +9,7 @@ export interface DrawOptions {
   offsetY: number;       // إزاحة Y
   lineWidth: number;     // سماكة الخط
   color: string;         // لون الخط الأساسي
+  textColor?: string;    // لون النص (تجاوز color عند الرسم)
   dimensionColor: string; // لون خطوط الأبعاد
   rebarColor: string;    // لون التسليح
   concreteColor: string; // لون الخرسانة
@@ -217,7 +218,7 @@ export function drawLabel(
     16 + padding * 2
   );
 
-  ctx.fillStyle = options.color;
+  ctx.fillStyle = options.textColor || options.color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, x, y);
