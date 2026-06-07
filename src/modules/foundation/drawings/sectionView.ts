@@ -2,8 +2,9 @@
 // رسم مقطع الأساس العرضي (Section View)
 // الكود العربي السوري 2024 - يدعم العمود المعدني والشد
 // المنطق الذكي:
-//   منفرد/مستمر = تسليح سفلي فقط (بدون شبكة علوية)
-//   حصيرة/مشترك = شبكتان كاملتان (علوية + سفلية)
+//   منفرد/مستمر = تسليح سفلي فقط (بدون شبكة علوية بصرياً)
+//   مشترك = شبكة علوية كاملة (عزم سالب بين العمودين)
+//   حصيرة = شبكتان كاملتان + شريحة العمود
 // الرموز الكودية: t, D_f, σ₁
 // ============================================================
 
@@ -22,7 +23,12 @@ export function drawFoundationSection(
 ) {
   const opts = { ...DEFAULT_DRAW_OPTIONS, ...customOpts };
   const { B, L, D_f, t, columnWidth: c1, columnDepth: c2, cover, isSteelColumn, basePlateWidth, basePlateDepth } = inputs;
-  const isRaftOrCombined = inputs.type === 'mat' || inputs.type === 'combined';
+
+  // تصنيف النوع - فصل صارم للرسم
+  const isIsolatedOrStrip = inputs.type === 'isolated' || inputs.type === 'continuous';
+  const isCombined = inputs.type === 'combined';
+  const isRaft = inputs.type === 'mat';
+  const isRaftOrCombined = isRaft || isCombined;
 
   // تنظيف Canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -86,22 +92,15 @@ export function drawFoundationSection(
   const colHeight = dPx * 0.5;
 
   if (isSteelColumn) {
-    const steelWidth = c1Px * 0.6;
+    // ═══ رسم العمود المعدني بقطاع I (I-beam Profile) ═══
+    const flangeWidth = c1Px * 0.9;   // عرض الجناح
+    const webWidth = c1Px * 0.15;     // سمك الروح
+    const flangeThickness = colHeight * 0.12; // سماكة الجناح
+    const colTop = baseY - tPx - colHeight;
 
-    drawFilledRect(
-      ctx,
-      centerX - steelWidth / 2,
-      baseY - tPx - colHeight,
-      steelWidth,
-      colHeight,
-      '#64748b',
-      '#475569',
-      opts.lineWidth
-    );
-
-    // صفيحة الارتكاز (Base Plate)
+    // صفيحة الارتكاز (Base Plate) فوق سطح الخرسانة مباشرة
     const bpW = (basePlateWidth || c1) * scale;
-    const bpH = Math.max(8, tPx * 0.08);
+    const bpH = Math.max(10, tPx * 0.06);
     drawFilledRect(
       ctx,
       centerX - bpW / 2,
@@ -109,11 +108,63 @@ export function drawFoundationSection(
       bpW,
       bpH,
       '#475569',
-      '#334155',
+      '#1e293b',
       opts.lineWidth + 1
     );
 
-    // خط القطاع الحرج للعمود المعدني
+    // مسامير التثبيت (Anchor Bolts) - 4 مسامير على الأطراف
+    const boltRadius = 3;
+    const boltInsetX = bpW * 0.15;
+    const boltInsetY = bpH * 0.5;
+    ctx.fillStyle = '#94a3b8';
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    for (const dx of [-boltInsetX, boltInsetX]) {
+      for (const dy of [-boltInsetY, boltInsetY]) {
+        ctx.beginPath();
+        ctx.arc(centerX + dx, baseY - tPx - bpH / 2 + dy, boltRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    // الجناح العلوي (Top Flange)
+    drawFilledRect(
+      ctx,
+      centerX - flangeWidth / 2,
+      colTop,
+      flangeWidth,
+      flangeThickness,
+      '#64748b',
+      '#475569',
+      opts.lineWidth
+    );
+
+    // الروح (Web) - خط عمودي رفيع
+    drawFilledRect(
+      ctx,
+      centerX - webWidth / 2,
+      colTop + flangeThickness,
+      webWidth,
+      colHeight - 2 * flangeThickness,
+      '#94a3b8',
+      '#475569',
+      opts.lineWidth
+    );
+
+    // الجناح السفلي (Bottom Flange) - يرتكز على صفيحة الارتكاز
+    drawFilledRect(
+      ctx,
+      centerX - flangeWidth / 2,
+      baseY - tPx - bpH - flangeThickness,
+      flangeWidth,
+      flangeThickness,
+      '#64748b',
+      '#475569',
+      opts.lineWidth
+    );
+
+    // خط القطاع الحرج للعمود المعدني (عند منتصف المسافة بين وجه الصفيحة وحافة الأساس)
     const midPlate = ((basePlateDepth || c2) + c2) / 2 * scale;
     const criticalLineX = centerX - bPx / 2 + (bPx - midPlate) / 2;
 
@@ -126,9 +177,9 @@ export function drawFoundationSection(
     ctx.stroke();
     ctx.setLineDash([]);
 
-    drawLabel(ctx, 'القطاع الحرج', criticalLineX, baseY - tPx - 15, opts);
+    drawLabel(ctx, 'القطاع الحرج', criticalLineX, baseY - tPx - 20, opts);
   } else {
-    // عمود خرساني عادي
+    // ═══ عمود خرساني عادي ═══
     drawFilledRect(
       ctx,
       centerX - c1Px / 2,
@@ -151,7 +202,7 @@ export function drawFoundationSection(
     ctx.stroke();
     ctx.setLineDash([]);
 
-    drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - tPx - 15, opts);
+    drawLabel(ctx, 'القطاع الحرج', criticalX, baseY - tPx - 20, opts);
   }
 
   // ══════════════════════════════════════
@@ -181,11 +232,19 @@ export function drawFoundationSection(
     }
 
     // تسمية التسليح السفلي
-    drawLabel(ctx, 'فرش سفلي', centerX + bPx / 2 + 5, rebarY - 10, opts);
+    drawLabel(ctx, 'فرش سفلي', centerX + bPx / 2 + 5, rebarY + 5, opts);
 
-    // ── أسياخ علوية (فقط للحصيرة/المشترك) ──
-    if (isRaftOrCombined && results.topRebarRequired) {
-      const topRebarY = baseY - tPx + 15;
+    // ══════════════════════════════════════════════════
+    // أسياخ علوية - الفصل الصارم حسب نوع الأساس
+    // ══════════════════════════════════════════════════
+    if (isIsolatedOrStrip) {
+      // ═══ منفرد/مستمر: إلغاء كامل بصري - لا خطوط ولا أسياخ علوية ═══
+      // الأساس المنفرد والمستمر لا يتطلب تسليحاً علويّاً كودياً
+      // المقطع يظهر خاوياً من الحديد العلوي
+      // (لا نرسم أي شيء هنا - التسليح السفلي فقط)
+    } else if ((isCombined || isRaft) && results.topRebarRequired) {
+      // ═══ مشترك/حصيرة: شبكة علوية كاملة ═══
+      const topRebarY = baseY - tPx + 20;
       ctx.beginPath();
       ctx.moveTo(centerX - bPx / 2 + 10, topRebarY);
       ctx.lineTo(centerX + bPx / 2 - 10, topRebarY);
@@ -203,14 +262,14 @@ export function drawFoundationSection(
         }
       }
 
-      // تسمية التسليح العلوي
-      if (inputs.type === 'combined') {
-        drawLabel(ctx, 'شبكة علوية (عزم سالب بين العمودين)', centerX + bPx / 2 + 5, topRebarY - 10, opts);
+      // تسمية التسليح العلوي - إزاحة رأسية 40px لمنع التداخل
+      const topLabelY = topRebarY + 40;
+      if (isCombined) {
+        drawLabel(ctx, 'شبكة علوية (عزم سالب بين العمودين)', centerX + bPx / 2 + 5, topLabelY, opts);
       } else {
-        drawLabel(ctx, 'شبكة علوية كاملة + شريحة العمود', centerX + bPx / 2 + 5, topRebarY - 10, opts);
+        drawLabel(ctx, 'شبكة علوية كاملة + شريحة العمود', centerX + bPx / 2 + 5, topLabelY, opts);
       }
     }
-    // منفرد/مستمر: لا نرسم أي شيء علوي - التسليح السفلي فقط (الفرش والغطاء)
   }
 
   // ─── منطقة الشد (إن وجدت) ───
@@ -280,9 +339,9 @@ export function drawFoundationSection(
     drawLabel(ctx, 'خرسانة', centerX, baseY - tPx / 2, opts);
 
     if (isSteelColumn) {
-      drawLabel(ctx, 'عمود معدني', centerX, baseY - tPx - colHeight / 2, opts);
+      drawLabel(ctx, 'عمود معدني (I)', centerX, baseY - tPx - colHeight / 2, opts);
     } else {
-      drawLabel(ctx, 'عمود', centerX, baseY - tPx - colHeight / 2, opts);
+      drawLabel(ctx, 'عمود خرساني', centerX, baseY - tPx - colHeight / 2, opts);
     }
 
     drawLabel(ctx, 'تربة', centerX + bPx / 2 - 30, baseY - dPx + 20, opts);
