@@ -55,6 +55,18 @@ export interface FoundationInputs {
 
   // حصيرة عامة فقط
   maxColumnSpacing: number; // أكبر مسافة بين عمودين متجاورين (m) - لشرط الجساءة
+
+  // حقول المشترك (Combined)
+  V2?: number;               // الحمولة الشاقولية للعمود الثاني (kN)
+  M_x2?: number;             // العزم حول X للعمود الثاني (kN.m)
+  M_y2?: number;             // العزم حول Y للعمود الثاني (kN.m)
+  c_width2?: number;         // عرض العمود الثاني (m)
+  c_depth2?: number;         // عمق العمود الثاني (m)
+  L_span?: number;           // المسافة المحورية بين العمودين (m)
+
+  // حقول جائز التقويم (Strap Beam)
+  strapWidth?: number;       // عرض جائز التقويم (m)
+  strapHeight?: number;      // ارتفاع جائز التقويم (m)
 }
 
 /** نتائج حسابات الأساس - الرموز الكودية السورية */
@@ -111,6 +123,17 @@ export interface FoundationResults {
     message: string;
   };
 
+  // العزم السالب المحسوب (للمشترك)
+  M_negative?: number;
+
+  // تحقق جائز التقويم
+  strapBeamCheck?: {
+    isSafe: boolean;
+    width: number;
+    height: number;
+    message: string;
+  };
+
   // التحققات الموحدة
   checks: CheckResult[];
 
@@ -162,6 +185,14 @@ const defaultInputs: FoundationInputs = {
   barDiameterChosen: 14,
   betaEccentricity: 1.15,
   maxColumnSpacing: 5.0,
+  V2: 350,
+  M_x2: 20,
+  M_y2: 10,
+  c_width2: 0.4,
+  c_depth2: 0.4,
+  L_span: 4.5,
+  strapWidth: 0.3,
+  strapHeight: 0.5,
 };
 
 const defaultResults: FoundationResults = {

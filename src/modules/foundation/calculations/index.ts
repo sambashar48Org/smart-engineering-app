@@ -48,7 +48,8 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // ── وزن الأساس والتربة ──
   const foundationWeight = B * L * t * 24;
   const soilWeight = B * L * (D_f - t) * gamma;
-  const totalVerticalService = V + foundationWeight + soilWeight;
+  const P_vertical_external = type === 'combined' ? (V + (inputs.V2 || 0)) : V;
+  const totalVerticalService = P_vertical_external + foundationWeight + soilWeight;
 
   // ══════════════════════════════════════
   // 1. حساب إجهاد التربة (SLS - تشغيلي)
@@ -85,7 +86,7 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
   // ══════════════════════════════════════
   // 3. القص والقص الثاقب (ULS - حدّي)
   // ══════════════════════════════════════
-  const P_ultimate = V * 1.35 + foundationWeight * 1.35;
+  const P_ultimate = (type === 'combined' ? (V + (inputs.V2 || 0)) : V) * 1.35 + foundationWeight * 1.35;
 
   const shearResults = calculateShearAndPunching({
     P_ultimate,
@@ -100,6 +101,13 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     basePlateWidth,
     basePlateDepth,
   });
+
+  // ═══ إعفاء الأساس المستمر من القص الثاقب ═══
+  if (type === 'continuous') {
+    shearResults.punchingShearSafe = true;
+    shearResults.v_max_punching = 0;
+    shearResults.v_concrete_punching = 0;
+  }
 
   // ══════════════════════════════════════
   // 4. الانحناء والتسليح (ULS - حدّي)
@@ -197,6 +205,14 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     };
   }
 
+  // ═══ أتمتة العزم السالب للأساس المشترك ═══
+  let M_negative: number | undefined;
+  if (type === 'combined') {
+    const L_span = inputs.L_span || 4.5;
+    const net_soil_pressure_u = P_ultimate / (B * L);
+    M_negative = (net_soil_pressure_u * B * Math.pow(L_span, 2)) / 8;
+  }
+
   // ══════════════════════════════════════
   // 5. تحقق جساءة الحصيرة [بند 11]
   // ══════════════════════════════════════
@@ -212,6 +228,24 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
       message: isRigid
         ? '✅ الحصيرة تعمل كجسم صلد وفق [بند 11] - السمك كافٍ'
         : `❌ الحصيرة لا تعمل كجسم صلد وفق [بند 11] - سمك الحصيرة (${t}m) أقل من الحد الأدنى (${minThickness.toFixed(3)}m = أكبر مسافة بين أعمدة / 8)`,
+    };
+  }
+
+  // ══════════════════════════════════════
+  // 5b. تحقق جائز التقويم (مشترك/مستمر)
+  // ══════════════════════════════════════
+  let strapBeamCheck: FoundationResults['strapBeamCheck'] = undefined;
+  if (type === 'combined' || type === 'continuous') {
+    const sw = inputs.strapWidth || 0.3;
+    const sh = inputs.strapHeight || 0.5;
+    const isSafe = sh >= 0.4 && sw >= 0.25;
+    strapBeamCheck = {
+      isSafe,
+      width: sw,
+      height: sh,
+      message: isSafe
+        ? '✅ أبعاد جائز التقويم كافية كودياً'
+        : `❌ أبعاد جائز التقويم غير كافية - الحد الأدنى: عرض 0.25m وارتفاع 0.40m`,
     };
   }
 
@@ -285,6 +319,21 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     );
   }
 
+  // إضافة تحقق جائز التقويم
+  if (strapBeamCheck) {
+    checks.push(
+      makeCheck(
+        'Strap Beam',
+        'تحقق جائز التقويم',
+        Math.min(strapBeamCheck.width, strapBeamCheck.height),
+        0.25,
+        'm',
+        strapBeamCheck.isSafe,
+        strapBeamCheck.message
+      )
+    );
+  }
+
   return {
     // إجهاد التربة
     sigma_1: soilResults.sigma_1,
@@ -345,6 +394,12 @@ export function calculateFoundation(inputs: FoundationInputs): FoundationResults
     // جساءة الحصيرة
     raftStiffnessCheck,
 
+    // العزم السالب (للمشترك)
+    M_negative,
+
+    // تحقق جائز التقويم
+    strapBeamCheck,
+
     // التحققات
     checks,
 
@@ -387,4 +442,30 @@ function makeCheck(
     unit,
     message,
   };
+}
+
+/** خوارزمية التقييم والتكبير التكراري الذكي للأبعاد */
+export function optimizeFoundationDimensions(currentInputs: FoundationInputs): FoundationInputs {
+  let optimized = { ...currentInputs };
+  let isSafe = false;
+  let iterations = 0;
+  const maxIterations = 50;
+
+  while (!isSafe && iterations < maxIterations) {
+    const results = calculateFoundation(optimized);
+    iterations++;
+
+    if (!results.bearingSafe) {
+      optimized.B += 0.10;
+      optimized.L += 0.10;
+    }
+    else if (!results.oneWayShearSafe || !results.punchingShearSafe) {
+      optimized.t += 0.05;
+    }
+    else {
+      isSafe = true;
+    }
+  }
+
+  return optimized;
 }
