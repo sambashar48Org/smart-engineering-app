@@ -169,7 +169,7 @@ export default function FoundationPage() {
             const newResults = calculateFoundation(optimized);
             setResults(newResults);
           }}
-          title={lang === 'ar' ? 'تحديد الأبعاد تلقائياً' : 'Auto-size dimensions'}
+          className="relative group"
         >
           <Settings2 size={16} />
           {lang === 'ar' ? 'تحسين' : 'Auto-Size'}
