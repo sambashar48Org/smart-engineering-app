@@ -104,44 +104,45 @@ export function drawFoundationSection(
     ctx.fillText('جدار', planCX, planCY);
     ctx.restore();
   } else if (isCombined) {
-    // عمودان على المسقط
+    // عمودان على المسقط — المحور بينهما باتجاه L (الطول)
     const L_span = inputs.L_span || 4.5;
     const c_w2 = inputs.c_width2 || 0.4;
     const c_d2 = inputs.c_depth2 || 0.4;
-    const spanPlanX = L_span * planScale;
     const c1PlanB = c1 * planScale;
     const c1PlanL = c2 * planScale;
     const c2PlanB = c_w2 * planScale;
     const c2PlanL = c_d2 * planScale;
+    // المسافة بين العمودين باتجاه L — تحجيم لتناسب داخل المستطيل
+    const spanPlanL = Math.min(L_span * planScale, lPlan - c1PlanL / 2 - c2PlanL / 2 - 10);
 
-    // العمود 1
-    const col1CX = planCX - spanPlanX / 2;
+    // العمود 1 (أعلى المسقط)
+    const col1CY = planCY - spanPlanL / 2;
     ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(col1CX - c1PlanB / 2, planCY - c1PlanL / 2, c1PlanB, c1PlanL);
+    ctx.fillRect(planCX - c1PlanB / 2, col1CY - c1PlanL / 2, c1PlanB, c1PlanL);
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(col1CX - c1PlanB / 2, planCY - c1PlanL / 2, c1PlanB, c1PlanL);
+    ctx.strokeRect(planCX - c1PlanB / 2, col1CY - c1PlanL / 2, c1PlanB, c1PlanL);
     ctx.save();
     ctx.font = '9px Cairo, sans-serif';
     ctx.fillStyle = '#1e293b';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('ع1', col1CX, planCY);
+    ctx.fillText('ع1', planCX, col1CY);
     ctx.restore();
 
-    // العمود 2
-    const col2CX = planCX + spanPlanX / 2;
+    // العمود 2 (أسفل المسقط)
+    const col2CY = planCY + spanPlanL / 2;
     ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(col2CX - c2PlanB / 2, planCY - c2PlanL / 2, c2PlanB, c2PlanL);
+    ctx.fillRect(planCX - c2PlanB / 2, col2CY - c2PlanL / 2, c2PlanB, c2PlanL);
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(col2CX - c2PlanB / 2, planCY - c2PlanL / 2, c2PlanB, c2PlanL);
+    ctx.strokeRect(planCX - c2PlanB / 2, col2CY - c2PlanL / 2, c2PlanB, c2PlanL);
     ctx.save();
     ctx.font = '9px Cairo, sans-serif';
     ctx.fillStyle = '#1e293b';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('ع2', col2CX, planCY);
+    ctx.fillText('ع2', planCX, col2CY);
     ctx.restore();
   } else {
     // عمود واحد (منفرد أو حصيرة)
@@ -371,11 +372,12 @@ export function drawFoundationSection(
     drawFilledRect(ctx, secCX - wallW / 2, secBaseY - tSec - wallH, wallW, wallH, '#78716c', '#475569', 1.5);
     drawHatching(ctx, secCX - wallW / 2, secBaseY - tSec - wallH, wallW, wallH, 8, 45, '#57534e');
   } else if (isCombined) {
-    // عمودان
+    // عمودان على المقطع — داخل عرض الأساس
     const L_span = inputs.L_span || 4.5;
     const c_w2 = inputs.c_width2 || 0.4;
-    const spanSecPx = Math.min(L_span * secScale, bSec * 0.7);
     const c2SecPx = c_w2 * secScale;
+    // المسافة بين العمودين — تحجيم لتناسب داخل B
+    const spanSecPx = Math.min(L_span * secScale, bSec - c1Sec / 2 - c2SecPx / 2 - 10);
 
     const col1X = secCX - spanSecPx / 2;
     const col2X = secCX + spanSecPx / 2;
@@ -423,19 +425,20 @@ export function drawFoundationSection(
   //  التسليح على المقطع العرضي
   // ══════════════════════════════════════════════════
   if (opts.showRebar && results.calculated) {
-    const dEffective = (t * 1000 - cover - 10) / 1000;
-    const rebarDepth = dEffective * secScale;
-    const rebarY = secBaseY - rebarDepth;
     const coverPx = (cover / 1000) * secScale;
     const rebarInset = Math.max(coverPx, 10);
+    const barRadius = 5; // نصف قطر السيخ بالبكسل
 
-    // ── أسياخ سفلية: خط سميك أحمر ──
+    // ═══ أسياخ سفلية: قرب أسفل البلاطة ═══
+    // الموقع الصحيح: من أسفل البلاطة + الغطاء الخرساني
+    const bottomRebarY = secBaseY - coverPx - barRadius;
+
     ctx.save();
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(secCX - bSec / 2 + rebarInset, rebarY);
-    ctx.lineTo(secCX + bSec / 2 - rebarInset, rebarY);
+    ctx.moveTo(secCX - bSec / 2 + rebarInset, bottomRebarY);
+    ctx.lineTo(secCX + bSec / 2 - rebarInset, bottomRebarY);
     ctx.stroke();
     ctx.restore();
 
@@ -445,14 +448,15 @@ export function drawFoundationSection(
       const startX = secCX - bSec / 2 + rebarInset + 5;
       const endX = secCX + bSec / 2 - rebarInset - 5;
       for (let x = startX; x <= endX; x += Math.max(spacing, 12)) {
-        drawRebarDot(ctx, x, rebarY, 5, '#dc2626');
+        drawRebarDot(ctx, x, bottomRebarY, barRadius, '#dc2626');
       }
     }
 
-    // ── أسياخ علوية (للمشترك والحصيرة فقط) ──
-    if (showTopRebar) {
-      const topRebarY = secBaseY - tSec + (cover / 1000) * secScale + 5;
+    // ═══ أسياخ علوية: قرب أعلى البلاطة ═══
+    // الموقع الصحيح: من أعلى البلاطة + الغطاء الخرساني
+    const topRebarY = secBaseY - tSec + coverPx + barRadius;
 
+    if (showTopRebar) {
       ctx.save();
       ctx.strokeStyle = '#f97316';
       ctx.lineWidth = 3;
@@ -468,7 +472,7 @@ export function drawFoundationSection(
         const startX = secCX - bSec / 2 + rebarInset + 5;
         const endX = secCX + bSec / 2 - rebarInset - 5;
         for (let x = startX; x <= endX; x += Math.max(spacing, 12)) {
-          drawRebarDot(ctx, x, topRebarY, 5, '#f97316');
+          drawRebarDot(ctx, x, topRebarY, barRadius, '#f97316');
         }
       }
 
@@ -483,8 +487,8 @@ export function drawFoundationSection(
         ctx.setLineDash([3, 2]);
         for (let x = chairStartX; x <= chairEndX; x += chairSpacing) {
           ctx.beginPath();
-          ctx.moveTo(x, rebarY - 3);
-          ctx.lineTo(x, topRebarY + 3);
+          ctx.moveTo(x, bottomRebarY - barRadius);
+          ctx.lineTo(x, topRebarY + barRadius);
           ctx.stroke();
         }
         ctx.setLineDash([]);
